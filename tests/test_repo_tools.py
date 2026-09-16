@@ -15,6 +15,14 @@ def test_read_and_search_are_scoped(tmp_path: Path) -> None:
     assert repo.read_file("src/demo.py", start_line=2, end_line=2) == "2: beta"
 
 
+def test_search_falls_back_without_rg(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "demo.py").write_text("needle\n", encoding="utf-8")
+    monkeypatch.setattr("qwen_mcp.repo_tools.shutil.which", lambda _: None)
+    repo = RepoContext.create(str(tmp_path))
+
+    assert repo.search_text("needle") == "demo.py:1: needle"
+
+
 def test_path_escape_is_rejected(tmp_path: Path) -> None:
     repo = RepoContext.create(str(tmp_path))
     with pytest.raises(RepoToolError, match="escapes workspace"):

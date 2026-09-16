@@ -1,4 +1,4 @@
-# foo — Qwen coding subagent MCP
+# Qwen Coder Subagent MCP
 
 Codexからローカル `Qwen3-Coder-30B-A3B-Instruct Q4_K_M` を読み取り専用サブエージェントとして呼び出すためのMCPブリッジです。
 
@@ -7,7 +7,8 @@ Codexからローカル `Qwen3-Coder-30B-A3B-Instruct Q4_K_M` を読み取り専
 ```text
 Codex
   -> stdio MCP: qwen-mcp
-  -> llama.cpp OpenAI-compatible API
+  -> persistent localhost HTTP
+  -> llama.cpp
   -> Qwen3-Coder-30B-A3B-Instruct Q4_K_M
 ```
 
@@ -15,55 +16,44 @@ Qwenには任意shellや書込み権限を渡しません。MCPブリッジが�
 
 仕様正本: [`docs/specs/qwen-subagent.md`](docs/specs/qwen-subagent.md)
 
-## 1. llama.cpp をインストール
+## Setup
 
 Windows:
 
 ```powershell
 winget install llama.cpp
-```
-
-## 2. Python環境を作る
-
-```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 ```
 
-## 3. Qwenを起動
+`rg` (ripgrep) がPATHにあれば、Qwenのリポジトリ文字列検索は自動的に `rg` を使用します。ない場合はPython実装へフォールバックします。
+
+## Start Qwen
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\start-model.ps1
 ```
 
-初回は `lmstudio-community/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M` を取得します。Q4_K_Mは約18.6GBです。
+初回起動時は `llama-bench` で複数の `n_cpu_moe` 値を測定し、生成速度が最も高かった値を `.local/qwen-tuning.json` に保存して起動へ反映します。失敗した場合は安全側の `--cpu-moe` にフォールバックします。
 
-対象PC（RTX 4060 8GB / RAM 32GB）向けの初期設定:
+GPU、llama.cpp、量子化を変更した後は再測定できます。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-model.ps1 -Retune
+```
+
+対象PC向け既定値:
 
 - context: 16K
-- MoE experts: CPU
+- MoE expert placement: `n_cpu_moe` 実測選択
 - GPU layers: auto
 - Flash Attention: on
 - KV cache: Q8
 - endpoint: `http://127.0.0.1:8080/v1`
 - model alias: `qwen3-coder-30b-a3b`
 
-## 4. MCP単体確認
+## Codex / MCP
 
-別ターミナルで:
-
-```powershell
-.\.venv\Scripts\python.exe -m qwen_mcp.server
-```
-
-stdio MCPなので、正常時は何も表示せず入力待ちになります。開発確認にはMCP Inspectorも使えます。
-
-```powershell
-.\.venv\Scripts\mcp.exe dev src\qwen_mcp\server.py
-```
-
-## 5. Codexから使う
-
-`.codex/config.toml` に `qwen-coder` MCPを登録済みです。Codexをこのリポジトリから起動し直すと、次のMCP toolsを利用できます。
+`.codex/config.toml` に `qwen-coder` MCPを登録済みです。Codexをこのリポジトリから起動すると以下を利用できます。
 
 - `qwen_health`
 - `qwen_delegate`
@@ -71,9 +61,25 @@ stdio MCPなので、正常時は何も表示せず入力待ちになります�
 例:
 
 ```text
-qwen_delegate を使ってこのrepoのMCP実装を読み取り専用でレビューし、
+qwen_delegate を使ってこのrepoを読み取り専用でレビューし、
 バグ候補を path:line の根拠付きで返して。変更はしないこと。
 ```
+
+## Performance benchmark
+
+性能計測はGPU・CPU・ドライバ・llama.cpp buildに依存するため、通常のGitHub Actionsには入れません。ローカルで基準値を作成します。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\benchmark-model.ps1 -WriteBaseline
+```
+
+その後の変更で:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\benchmark-model.ps1
+```
+
+prompt処理または生成速度が基準から既定15%以上低下すると失敗します。結果は `.local/` に保存され、Git管理しません。
 
 ## Environment variables
 
@@ -95,4 +101,4 @@ qwen_delegate を使ってこのrepoのMCP実装を読み取り専用でレビ�
 docker build -t qwen-coder-subagent-mcp:test .
 ```
 
-GitHub Actions runs the same quality gates on pull requests and `main`.
+GitHub Actions runs deterministic quality gates only; hardware performance is measured separately with `benchmark-model.ps1`.

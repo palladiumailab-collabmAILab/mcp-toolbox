@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -94,24 +95,15 @@ class RepoContext:
     def search_text(self, query: str, path: str = ".", max_matches: int = 100) -> str:
         if not query:
             raise RepoToolError("query must not be empty")
+        if max_matches < 1:
+            raise RepoToolError("max_matches must be >= 1")
         start = self._resolve(path)
-        candidates = [start] if start.is_file() else self._iter_files(start)
-        matches: list[str] = []
-
-        for file_path in candidates:
-            try:
-                if file_path.stat().st_size > _MAX_FILE_BYTES:
-                    continue
-                text = file_path.read_text(encoding="utf-8", errors="replace")
-            except (OSError, UnicodeError):
-                continue
-            for line_number, line in enumerate(text.splitlines(), start=1):
-                if query in line:
-                    rel = file_path.relative_to(self.root)
-                    matches.append(f"{rel}:{line_number}: {line}")
-                    if len(matches) >= max_matches:
-                        return self._truncate("\n".join(matches) + "\n...[match limit reached]")
-        return self._truncate("\n".join(matches))
+        if not start.exists():
+            raise RepoToolError(f"path does not exist: {path}")
+        rg = shutil.which("rg")
+        if rg is not None:
+            return self._search_with_rg(rg, query, start, max_matches)
+        return self._search_python(query, start, max_matches)
 
     def git_status(self) -> str:
         return self._git(["status", "--short", "--branch"])
@@ -153,6 +145,81 @@ class RepoContext:
                 path=None if path is None else str(path),
             )
         raise RepoToolError(f"unsupported tool: {tool}")
+
+    def _search_with_rg(self, rg: str, query: str, start: Path, max_matches: int) -> str:
+        relative_start = str(start.relative_to(self.root)) if start != self.root else "."
+        args = [
+            rg,
+            "--fixed-strings",
+            "--line-number",
+            "--no-heading",
+            "--color",
+            "never",
+            "--hidden",
+            "--no-ignore",
+            "--max-filesize",
+            str(_MAX_FILE_BYTES),
+        ]
+        for directory in sorted(_EXCLUDED_DIRS):
+            args.extend(["--glob", f"!{directory}/**", "--glob", f"!**/{directory}/**"])
+        args.extend(["--", query, relative_start])
+
+        process = subprocess.Popen(
+            args,
+            cwd=self.root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        matches: list[str] = []
+        assert process.stdout is not None
+        try:
+            for raw_line in process.stdout:
+                line = raw_line.rstrip("\r\n")
+                if not line:
+                    continue
+                parts = line.split(":", 2)
+                if len(parts) == 3:
+                    line = f"{parts[0]}:{parts[1]}: {parts[2]}"
+                matches.append(line)
+                if len(matches) >= max_matches:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=2)
+                    return self._truncate("\n".join(matches) + "\n...[match limit reached]")
+        finally:
+            process.stdout.close()
+
+        assert process.stderr is not None
+        stderr = process.stderr.read().strip()
+        process.stderr.close()
+        return_code = process.wait(timeout=15)
+        if return_code not in (0, 1):
+            raise RepoToolError(stderr or f"rg exited {return_code}")
+        return self._truncate("\n".join(matches))
+
+    def _search_python(self, query: str, start: Path, max_matches: int) -> str:
+        candidates = [start] if start.is_file() else self._iter_files(start)
+        matches: list[str] = []
+        for file_path in candidates:
+            try:
+                if file_path.stat().st_size > _MAX_FILE_BYTES:
+                    continue
+                text = file_path.read_text(encoding="utf-8", errors="replace")
+            except (OSError, UnicodeError):
+                continue
+            for line_number, line in enumerate(text.splitlines(), start=1):
+                if query in line:
+                    rel = file_path.relative_to(self.root)
+                    matches.append(f"{rel}:{line_number}: {line}")
+                    if len(matches) >= max_matches:
+                        return self._truncate("\n".join(matches) + "\n...[match limit reached]")
+        return self._truncate("\n".join(matches))
 
     def _iter_files(self, start: Path) -> list[Path]:
         files: list[Path] = []

@@ -21,7 +21,8 @@ mcp = MCPServer(
 async def qwen_health() -> dict[str, Any]:
     """Check whether the configured local llama.cpp OpenAI-compatible endpoint is reachable."""
     settings = Settings.from_env()
-    return await LlamaClient(settings).health()
+    async with LlamaClient(settings) as client:
+        return await client.health()
 
 
 @mcp.tool()

@@ -55,11 +55,13 @@ async def run_agent(
 ) -> dict[str, Any]:
     effective_settings = settings or Settings.from_env()
     repo = RepoContext.create(workspace, effective_settings.max_tool_output_chars)
-    model = client or LlamaClient(effective_settings)
     rounds = max_rounds if max_rounds is not None else effective_settings.max_rounds
     if rounds < 1 or rounds > 32:
         raise ValueError("max_rounds must be between 1 and 32")
 
+    owned_model = None if client is not None else LlamaClient(effective_settings)
+    model = client or owned_model
+    assert model is not None
     messages: list[dict[str, str]] = [
         {"role": "system", "content": _SYSTEM_PROMPT},
         {
@@ -69,38 +71,47 @@ async def run_agent(
     ]
     trace: list[dict[str, Any]] = []
 
-    for _ in range(rounds):
-        action = await model.complete_json(messages, _RESPONSE_SCHEMA)
-        kind = action.get("kind")
-        if kind == "final":
-            answer = str(action.get("answer", "")).strip()
-            if not answer:
-                raise RuntimeError("Qwen returned an empty final answer")
-            return {"answer": answer, "rounds": len(trace) + 1, "trace": trace}
+    try:
+        for _ in range(rounds):
+            action = await model.complete_json(messages, _RESPONSE_SCHEMA)
+            kind = action.get("kind")
+            if kind == "final":
+                answer = str(action.get("answer", "")).strip()
+                if not answer:
+                    raise RuntimeError("Qwen returned an empty final answer")
+                return {"answer": answer, "rounds": len(trace) + 1, "trace": trace}
 
-        if kind != "tool":
-            raise RuntimeError(f"invalid Qwen action kind: {kind!r}")
-        tool = action.get("tool")
-        arguments = action.get("arguments")
-        if tool not in _ALLOWED_TOOLS or not isinstance(arguments, dict):
-            raise RuntimeError("Qwen requested an invalid tool action")
+            if kind != "tool":
+                raise RuntimeError(f"invalid Qwen action kind: {kind!r}")
+            tool = action.get("tool")
+            arguments = action.get("arguments")
+            if tool not in _ALLOWED_TOOLS or not isinstance(arguments, dict):
+                raise RuntimeError("Qwen requested an invalid tool action")
 
-        try:
-            result = repo.execute(str(tool), arguments)
-        except (RepoToolError, KeyError, TypeError, ValueError) as exc:
-            result = f"ERROR: {exc}"
+            try:
+                result = repo.execute(str(tool), arguments)
+            except (RepoToolError, KeyError, TypeError, ValueError) as exc:
+                result = f"ERROR: {exc}"
 
-        trace.append({"tool": tool, "arguments": arguments})
-        messages.append({"role": "assistant", "content": json.dumps(action, ensure_ascii=False)})
-        messages.append(
-            {
-                "role": "user",
-                "content": f"Tool result for {tool}:\n{result}",
-            }
-        )
+            trace.append({"tool": tool, "arguments": arguments})
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": json.dumps(action, ensure_ascii=False),
+                }
+            )
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"Tool result for {tool}:\n{result}",
+                }
+            )
 
-    return {
-        "answer": "Qwen reached the tool-round limit before producing a final answer.",
-        "rounds": rounds,
-        "trace": trace,
-    }
+        return {
+            "answer": "Qwen reached the tool-round limit before producing a final answer.",
+            "rounds": rounds,
+            "trace": trace,
+        }
+    finally:
+        if owned_model is not None:
+            await owned_model.aclose()

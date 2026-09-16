@@ -11,12 +11,21 @@ from .config import Settings
 class LlamaClient:
     def __init__(self, settings: Settings):
         self.settings = settings
+        self._client = httpx.AsyncClient(timeout=settings.timeout_seconds)
+
+    async def __aenter__(self) -> LlamaClient:
+        return self
+
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
+        await self.aclose()
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
 
     async def health(self) -> dict[str, Any]:
-        async with httpx.AsyncClient(timeout=self.settings.timeout_seconds) as client:
-            response = await client.get(f"{self.settings.base_url}/models")
-            response.raise_for_status()
-            payload = response.json()
+        response = await self._client.get(f"{self.settings.base_url}/models")
+        response.raise_for_status()
+        payload = response.json()
         return {"ok": True, "configured_model": self.settings.model, "server": payload}
 
     async def complete_json(
@@ -34,13 +43,12 @@ class LlamaClient:
                 "schema": response_schema,
             },
         }
-        async with httpx.AsyncClient(timeout=self.settings.timeout_seconds) as client:
-            response = await client.post(
-                f"{self.settings.base_url}/chat/completions",
-                json=payload,
-            )
-            response.raise_for_status()
-            data = response.json()
+        response = await self._client.post(
+            f"{self.settings.base_url}/chat/completions",
+            json=payload,
+        )
+        response.raise_for_status()
+        data = response.json()
         content = data["choices"][0]["message"]["content"]
         if not isinstance(content, str):
             raise RuntimeError("llama.cpp returned non-text message content")

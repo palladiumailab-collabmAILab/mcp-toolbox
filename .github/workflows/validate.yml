@@ -36,6 +36,30 @@ jobs:
       - name: Compile
         run: python -m compileall -q src
 
+      - name: Validate PowerShell syntax
+        shell: pwsh
+        run: |
+          $failed = $false
+          Get-ChildItem scripts -Filter '*.ps1' | ForEach-Object {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref]$tokens,
+              [ref]$parseErrors
+            ) | Out-Null
+            if ($parseErrors.Count -gt 0) {
+              foreach ($parseError in $parseErrors) {
+                Write-Host ("::error file={0},line={1}::{2}" -f `
+                  $_.FullName,
+                  $parseError.Extent.StartLineNumber,
+                  $parseError.Message)
+              }
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+
       - name: Validate skills and repository invariants
         run: |
           python scripts/validate-skills.py skills
