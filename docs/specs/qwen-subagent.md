@@ -61,6 +61,15 @@ The bridge does not depend on model-native function-calling. It requests schema-
 - `kind = "tool"` plus a supported tool and arguments; or
 - `kind = "final"` plus the answer.
 
+The system prompt includes complete examples of both envelopes and explicitly tells the model not to emit a native-style `name/arguments` function-call envelope.
+
+For compatibility with observed Qwen output, the bridge normalizes only two bounded deviations before validation:
+
+- an allowed tool emitted as `{"name": ..., "arguments": {...}}` or as `tool/arguments` without `kind`;
+- a non-empty `answer` object without `kind`.
+
+Unknown tool names and other malformed responses remain errors. Normalization does not expand the tool allowlist or bypass repository-side argument and path validation.
+
 The HTTP connection pool is reused for all inference rounds in one delegated task and closed when that task ends.
 
 ## Target-PC performance policy

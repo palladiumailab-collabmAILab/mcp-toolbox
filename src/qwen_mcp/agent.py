@@ -28,6 +28,13 @@ Use tools when repository evidence is needed. Prefer targeted searches and bound
 When finished, return a concise answer with concrete file paths and relevant line evidence.
 The parent agent will decide and apply any changes.
 
+Return exactly one JSON object in one of these two forms.
+Tool request example:
+{"kind":"tool","tool":"read_file","arguments":{"path":"README.md","start_line":1,"end_line":80},"answer":""}
+Final answer example:
+{"kind":"final","tool":null,"arguments":{},"answer":"README.md:1 contains the project title."}
+Do not use a function-call envelope such as {"name":"read_file","arguments":{...}}.
+
 Allowed tools and arguments:
 - list_files: {path?: string, max_entries?: integer}
 - search_text: {query: string, path?: string, max_matches?: integer}
@@ -43,6 +50,33 @@ class CompletionClient(Protocol):
         messages: list[dict[str, str]],
         response_schema: dict[str, Any],
     ) -> dict[str, Any]: ...
+
+
+def _normalize_action(action: dict[str, Any]) -> dict[str, Any]:
+    kind = action.get("kind")
+    if kind in {"tool", "final"}:
+        return action
+
+    arguments = action.get("arguments")
+    legacy_tool = action.get("name") or action.get("tool")
+    if legacy_tool in _ALLOWED_TOOLS and isinstance(arguments, dict):
+        return {
+            "kind": "tool",
+            "tool": legacy_tool,
+            "arguments": arguments,
+            "answer": "",
+        }
+
+    answer = action.get("answer")
+    if isinstance(answer, str) and answer.strip():
+        return {
+            "kind": "final",
+            "tool": None,
+            "arguments": {},
+            "answer": answer,
+        }
+
+    return action
 
 
 async def run_agent(
@@ -73,7 +107,7 @@ async def run_agent(
 
     try:
         for _ in range(rounds):
-            action = await model.complete_json(messages, _RESPONSE_SCHEMA)
+            action = _normalize_action(await model.complete_json(messages, _RESPONSE_SCHEMA))
             kind = action.get("kind")
             if kind == "final":
                 answer = str(action.get("answer", "")).strip()
