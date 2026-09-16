@@ -62,6 +62,19 @@ class InvalidLegacyToolClient:
         return {"name": "run_shell", "arguments": {"command": "echo unsafe"}}
 
 
+class StaticClient:
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self.payload = payload
+
+    async def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        response_schema: dict[str, Any],
+    ) -> dict[str, Any]:
+        del messages, response_schema
+        return self.payload
+
+
 @pytest.mark.asyncio
 async def test_agent_executes_read_only_tool_loop(tmp_path: Path) -> None:
     (tmp_path / "example.py").write_text("print('ok')\n", encoding="utf-8")
@@ -108,4 +121,27 @@ async def test_agent_rejects_unknown_legacy_tool(tmp_path: Path) -> None:
             str(tmp_path),
             settings=Settings(max_rounds=1),
             client=InvalidLegacyToolClient(),
+        )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"kind": "final"},
+        {"kind": "final", "answer": None},
+        {"kind": "final", "answer": 123},
+        {"kind": "final", "answer": "   "},
+    ],
+)
+@pytest.mark.asyncio
+async def test_agent_rejects_malformed_final_answer(
+    tmp_path: Path,
+    payload: dict[str, Any],
+) -> None:
+    with pytest.raises(RuntimeError, match="invalid final answer"):
+        await run_agent(
+            "Return a final answer",
+            str(tmp_path),
+            settings=Settings(max_rounds=1),
+            client=StaticClient(payload),
         )

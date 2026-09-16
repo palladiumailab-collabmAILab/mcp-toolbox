@@ -110,10 +110,10 @@ async def run_agent(
             action = _normalize_action(await model.complete_json(messages, _RESPONSE_SCHEMA))
             kind = action.get("kind")
             if kind == "final":
-                answer = str(action.get("answer", "")).strip()
-                if not answer:
-                    raise RuntimeError("Qwen returned an empty final answer")
-                return {"answer": answer, "rounds": len(trace) + 1, "trace": trace}
+                answer = action.get("answer")
+                if not isinstance(answer, str) or not answer.strip():
+                    raise RuntimeError("Qwen returned an invalid final answer")
+                return {"answer": answer.strip(), "rounds": len(trace) + 1, "trace": trace}
 
             if kind != "tool":
                 raise RuntimeError(f"invalid Qwen action kind: {kind!r}")

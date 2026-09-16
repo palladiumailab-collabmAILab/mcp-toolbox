@@ -7,6 +7,16 @@ import pytest
 from qwen_mcp.repo_tools import RepoContext, RepoToolError
 
 
+def _git(repo: Path, *args: str) -> str:
+    completed = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout
+
+
 def test_read_and_search_are_scoped(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "demo.py").write_text("alpha\nbeta\n", encoding="utf-8")
@@ -102,3 +112,51 @@ def test_git_inspection_disables_writes_and_external_filters(
     assert "--no-ext-diff" in diff_args
     assert "--no-textconv" in diff_args
     assert "--ignore-submodules=all" in diff_args
+    assert "--relative" in diff_args
+
+
+def test_git_inspection_stays_in_workspace_and_hides_sensitive_paths(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    workspace = repo_root / "workspace"
+    runtime_dir = workspace / ".local"
+    runtime_dir.mkdir(parents=True)
+
+    _git(repo_root, "init")
+    _git(repo_root, "config", "user.email", "test@example.invalid")
+    _git(repo_root, "config", "user.name", "Test")
+
+    visible = workspace / "visible.txt"
+    sensitive = workspace / ".env"
+    runtime = runtime_dir / "cache.txt"
+    outside = repo_root / "outside.txt"
+    visible.write_text("visible before\n", encoding="utf-8")
+    sensitive.write_text("TOKEN=before\n", encoding="utf-8")
+    runtime.write_text("runtime before\n", encoding="utf-8")
+    outside.write_text("outside before\n", encoding="utf-8")
+    _git(repo_root, "add", "-f", ".")
+    _git(repo_root, "commit", "-m", "initial")
+
+    visible.write_text("visible after\n", encoding="utf-8")
+    sensitive.write_text("TOKEN=after\n", encoding="utf-8")
+    runtime.write_text("runtime after\n", encoding="utf-8")
+    outside.write_text("outside after\n", encoding="utf-8")
+
+    repo = RepoContext.create(str(workspace))
+    status = repo.git_status()
+    diff = repo.git_diff()
+
+    assert "visible.txt" in status
+    assert "outside.txt" not in status
+    assert ".env" not in status
+    assert ".local" not in status
+    assert "visible after" in diff
+    assert "outside after" not in diff
+    assert "TOKEN=after" not in diff
+    assert "runtime after" not in diff
+
+    _git(repo_root, "add", "-f", ".")
+    staged_diff = repo.git_diff(staged=True)
+    assert "visible after" in staged_diff
+    assert "outside after" not in staged_diff
+    assert "TOKEN=after" not in staged_diff
+    assert "runtime after" not in staged_diff

@@ -64,6 +64,41 @@ class RepoContext:
         lowered = name.lower()
         return lowered in _SENSITIVE_FILENAMES or lowered.startswith(".env.")
 
+    @staticmethod
+    def _git_exclude_pathspecs() -> list[str]:
+        pathspecs: list[str] = []
+        for name in sorted(_SENSITIVE_FILENAMES):
+            pathspecs.extend(
+                [
+                    f":(exclude,glob){name}",
+                    f":(exclude,glob)**/{name}",
+                ]
+            )
+        pathspecs.extend(
+            [
+                ":(exclude,glob).env.*",
+                ":(exclude,glob)**/.env.*",
+            ]
+        )
+        for directory in sorted(_EXCLUDED_DIRS):
+            pathspecs.extend(
+                [
+                    f":(exclude,glob){directory}",
+                    f":(exclude,glob){directory}/**",
+                    f":(exclude,glob)**/{directory}",
+                    f":(exclude,glob)**/{directory}/**",
+                ]
+            )
+        return pathspecs
+
+    def _git_pathspecs(self, path: str | None = None) -> list[str]:
+        if path is None:
+            include = "."
+        else:
+            resolved = self._resolve(path)
+            include = str(resolved.relative_to(self.root))
+        return [include, *self._git_exclude_pathspecs()]
+
     def _truncate(self, text: str) -> str:
         if len(text) <= self.max_output_chars:
             return text
@@ -143,16 +178,22 @@ class RepoContext:
                 "--branch",
                 "--untracked-files=normal",
                 "--ignore-submodules=all",
+                "--",
+                *self._git_pathspecs(),
             ]
         )
 
     def git_diff(self, staged: bool = False, path: str | None = None) -> str:
-        args = ["diff", "--no-ext-diff", "--no-textconv", "--ignore-submodules=all"]
+        args = [
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--ignore-submodules=all",
+            "--relative",
+        ]
         if staged:
             args.append("--cached")
-        if path is not None:
-            resolved = self._resolve(path)
-            args.extend(["--", str(resolved.relative_to(self.root))])
+        args.extend(["--", *self._git_pathspecs(path)])
         return self._git(args)
 
     def execute(self, tool: str, arguments: dict[str, Any]) -> str:
