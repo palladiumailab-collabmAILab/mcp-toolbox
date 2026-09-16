@@ -1,0 +1,106 @@
+from __future__ import annotations
+
+import json
+from typing import Any, Protocol
+
+from .config import Settings
+from .llama_client import LlamaClient
+from .repo_tools import RepoContext, RepoToolError
+
+_ALLOWED_TOOLS = ["list_files", "search_text", "read_file", "git_status", "git_diff"]
+
+_RESPONSE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "kind": {"type": "string", "enum": ["tool", "final"]},
+        "tool": {"type": ["string", "null"], "enum": [*_ALLOWED_TOOLS, None]},
+        "arguments": {"type": "object"},
+        "answer": {"type": "string"},
+    },
+    "required": ["kind", "tool", "arguments", "answer"],
+    "additionalProperties": False,
+}
+
+_SYSTEM_PROMPT = """You are a read-only coding subagent working under a parent Codex agent.
+You may investigate the supplied repository only through the allowed tools.
+Never claim to edit files, run arbitrary commands, install packages, commit, push, or deploy.
+Use tools when repository evidence is needed. Prefer targeted searches and bounded reads.
+When finished, return a concise answer with concrete file paths and relevant line evidence.
+The parent agent will decide and apply any changes.
+
+Allowed tools and arguments:
+- list_files: {path?: string, max_entries?: integer}
+- search_text: {query: string, path?: string, max_matches?: integer}
+- read_file: {path: string, start_line?: integer, end_line?: integer}
+- git_status: {}
+- git_diff: {staged?: boolean, path?: string}
+"""
+
+
+class CompletionClient(Protocol):
+    async def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        response_schema: dict[str, Any],
+    ) -> dict[str, Any]: ...
+
+
+async def run_agent(
+    task: str,
+    workspace: str,
+    *,
+    settings: Settings | None = None,
+    client: CompletionClient | None = None,
+    max_rounds: int | None = None,
+) -> dict[str, Any]:
+    effective_settings = settings or Settings.from_env()
+    repo = RepoContext.create(workspace, effective_settings.max_tool_output_chars)
+    model = client or LlamaClient(effective_settings)
+    rounds = max_rounds if max_rounds is not None else effective_settings.max_rounds
+    if rounds < 1 or rounds > 32:
+        raise ValueError("max_rounds must be between 1 and 32")
+
+    messages: list[dict[str, str]] = [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": f"Workspace: {repo.root}\nTask: {task}",
+        },
+    ]
+    trace: list[dict[str, Any]] = []
+
+    for _ in range(rounds):
+        action = await model.complete_json(messages, _RESPONSE_SCHEMA)
+        kind = action.get("kind")
+        if kind == "final":
+            answer = str(action.get("answer", "")).strip()
+            if not answer:
+                raise RuntimeError("Qwen returned an empty final answer")
+            return {"answer": answer, "rounds": len(trace) + 1, "trace": trace}
+
+        if kind != "tool":
+            raise RuntimeError(f"invalid Qwen action kind: {kind!r}")
+        tool = action.get("tool")
+        arguments = action.get("arguments")
+        if tool not in _ALLOWED_TOOLS or not isinstance(arguments, dict):
+            raise RuntimeError("Qwen requested an invalid tool action")
+
+        try:
+            result = repo.execute(str(tool), arguments)
+        except (RepoToolError, KeyError, TypeError, ValueError) as exc:
+            result = f"ERROR: {exc}"
+
+        trace.append({"tool": tool, "arguments": arguments})
+        messages.append({"role": "assistant", "content": json.dumps(action, ensure_ascii=False)})
+        messages.append(
+            {
+                "role": "user",
+                "content": f"Tool result for {tool}:\n{result}",
+            }
+        )
+
+    return {
+        "answer": "Qwen reached the tool-round limit before producing a final answer.",
+        "rounds": rounds,
+        "trace": trace,
+    }
