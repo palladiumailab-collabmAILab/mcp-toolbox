@@ -81,6 +81,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\benchmark-model.ps1
 
 prompt処理または生成速度が基準から既定15%以上低下すると失敗します。結果は `.local/` に保存され、Git管理しません。
 
+実際のサブエージェント処理時間も含めて `n_cpu_moe` 候補を比較する場合は、[`docs/benchmark-subagent.md`](docs/benchmark-subagent.md) の固定タスク手順を使用します。実機測定で改善が確認されるまでは、起動時の自動選択規則は生成速度ベースのままです。
+
 ## Environment variables
 
 | Variable | Default | Purpose |

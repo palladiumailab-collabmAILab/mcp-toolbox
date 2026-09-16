@@ -1,0 +1,1 @@
+Determine how the MCP bridge prevents delegated Qwen from writing to or escaping the workspace. Identify path validation, blocked paths, and subprocess restrictions. Use repository tools as needed and cite concrete file paths and line evidence. Do not propose or apply changes.
