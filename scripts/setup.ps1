@@ -8,5 +8,11 @@ if (-not (Test-Path $Python)) {
 }
 
 & $Python -m pip install --upgrade pip
-& $Python -m pip install -r (Join-Path $RepoRoot "requirements-dev.txt")
+Push-Location $RepoRoot
+try {
+    & $Python -m pip install -e ".[dev]"
+}
+finally {
+    Pop-Location
+}
 Write-Host "Installed qwen-mcp development environment at $Venv"

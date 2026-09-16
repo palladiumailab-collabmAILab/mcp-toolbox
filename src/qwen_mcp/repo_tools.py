@@ -9,17 +9,23 @@ from typing import Any
 
 _EXCLUDED_DIRS = {
     ".git",
-    ".venv",
-    "venv",
-    "node_modules",
-    "dist",
-    "build",
-    "__pycache__",
+    ".local",
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "models",
+    "node_modules",
+    "venv",
 }
+_SENSITIVE_FILENAMES = {".env", ".git-credentials", ".netrc", ".npmrc", ".pypirc"}
 _MAX_FILE_BYTES = 2_000_000
+_MAX_LIST_ENTRIES = 1_000
+_MAX_SEARCH_MATCHES = 500
+_MAX_QUERY_CHARS = 512
 
 
 class RepoToolError(ValueError):
@@ -42,7 +48,21 @@ class RepoContext:
         candidate = (self.root / relative_path).resolve(strict=False)
         if not candidate.is_relative_to(self.root):
             raise RepoToolError("path escapes workspace")
+        self._ensure_allowed(candidate)
         return candidate
+
+    def _ensure_allowed(self, path: Path) -> None:
+        relative = path.relative_to(self.root)
+        lowered_parts = {part.lower() for part in relative.parts}
+        if lowered_parts.intersection(_EXCLUDED_DIRS):
+            raise RepoToolError("path is excluded from the local worker")
+        if path.name and self._is_sensitive_filename(path.name):
+            raise RepoToolError("path is excluded from the local worker")
+
+    @staticmethod
+    def _is_sensitive_filename(name: str) -> bool:
+        lowered = name.lower()
+        return lowered in _SENSITIVE_FILENAMES or lowered.startswith(".env.")
 
     def _truncate(self, text: str) -> str:
         if len(text) <= self.max_output_chars:
@@ -50,6 +70,8 @@ class RepoContext:
         return text[: self.max_output_chars] + "\n...[truncated]"
 
     def list_files(self, path: str = ".", max_entries: int = 200) -> str:
+        if not 1 <= max_entries <= _MAX_LIST_ENTRIES:
+            raise RepoToolError(f"max_entries must be between 1 and {_MAX_LIST_ENTRIES}")
         start = self._resolve(path)
         if not start.exists():
             raise RepoToolError(f"path does not exist: {path}")
@@ -58,12 +80,18 @@ class RepoContext:
 
         results: list[str] = []
         for current, dirs, files in os.walk(start):
-            dirs[:] = sorted(d for d in dirs if d not in _EXCLUDED_DIRS)
+            dirs[:] = sorted(d for d in dirs if d.lower() not in _EXCLUDED_DIRS)
             current_path = Path(current)
             for name in sorted(files):
+                if self._is_sensitive_filename(name):
+                    continue
                 file_path = current_path / name
                 resolved = file_path.resolve(strict=False)
                 if not resolved.is_relative_to(self.root):
+                    continue
+                try:
+                    self._ensure_allowed(resolved)
+                except RepoToolError:
                     continue
                 results.append(str(file_path.relative_to(self.root)))
                 if len(results) >= max_entries:
@@ -95,8 +123,10 @@ class RepoContext:
     def search_text(self, query: str, path: str = ".", max_matches: int = 100) -> str:
         if not query:
             raise RepoToolError("query must not be empty")
-        if max_matches < 1:
-            raise RepoToolError("max_matches must be >= 1")
+        if len(query) > _MAX_QUERY_CHARS:
+            raise RepoToolError(f"query exceeds {_MAX_QUERY_CHARS} characters")
+        if not 1 <= max_matches <= _MAX_SEARCH_MATCHES:
+            raise RepoToolError(f"max_matches must be between 1 and {_MAX_SEARCH_MATCHES}")
         start = self._resolve(path)
         if not start.exists():
             raise RepoToolError(f"path does not exist: {path}")
@@ -106,10 +136,18 @@ class RepoContext:
         return self._search_python(query, start, max_matches)
 
     def git_status(self) -> str:
-        return self._git(["status", "--short", "--branch"])
+        return self._git(
+            [
+                "status",
+                "--short",
+                "--branch",
+                "--untracked-files=normal",
+                "--ignore-submodules=all",
+            ]
+        )
 
     def git_diff(self, staged: bool = False, path: str | None = None) -> str:
-        args = ["diff"]
+        args = ["diff", "--no-ext-diff", "--no-textconv", "--ignore-submodules=all"]
         if staged:
             args.append("--cached")
         if path is not None:
@@ -156,9 +194,20 @@ class RepoContext:
             "--color",
             "never",
             "--hidden",
-            "--no-ignore",
             "--max-filesize",
             str(_MAX_FILE_BYTES),
+            "--glob",
+            "!.env",
+            "--glob",
+            "!.env.*",
+            "--glob",
+            "!.git-credentials",
+            "--glob",
+            "!.netrc",
+            "--glob",
+            "!.npmrc",
+            "--glob",
+            "!.pypirc",
         ]
         for directory in sorted(_EXCLUDED_DIRS):
             args.extend(["--glob", f"!{directory}/**", "--glob", f"!**/{directory}/**"])
@@ -224,22 +273,41 @@ class RepoContext:
     def _iter_files(self, start: Path) -> list[Path]:
         files: list[Path] = []
         for current, dirs, names in os.walk(start):
-            dirs[:] = sorted(d for d in dirs if d not in _EXCLUDED_DIRS)
+            dirs[:] = sorted(d for d in dirs if d.lower() not in _EXCLUDED_DIRS)
             current_path = Path(current)
             for name in sorted(names):
+                if self._is_sensitive_filename(name):
+                    continue
                 candidate = current_path / name
                 resolved = candidate.resolve(strict=False)
-                if resolved.is_relative_to(self.root) and candidate.is_file():
-                    files.append(candidate)
+                if not resolved.is_relative_to(self.root) or not candidate.is_file():
+                    continue
+                try:
+                    self._ensure_allowed(resolved)
+                except RepoToolError:
+                    continue
+                files.append(candidate)
         return files
 
     def _git(self, args: list[str]) -> str:
+        env = os.environ.copy()
+        env["GIT_OPTIONAL_LOCKS"] = "0"
+        env["GIT_TERMINAL_PROMPT"] = "0"
         completed = subprocess.run(
-            ["git", "-C", str(self.root), *args],
+            [
+                "git",
+                "--no-optional-locks",
+                "-c",
+                "core.fsmonitor=false",
+                "-C",
+                str(self.root),
+                *args,
+            ],
             check=False,
             capture_output=True,
             text=True,
             timeout=15,
+            env=env,
         )
         output = completed.stdout if completed.returncode == 0 else completed.stderr
         if completed.returncode != 0:

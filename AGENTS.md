@@ -21,7 +21,7 @@
 
 - Qwenは読み取り専用workerとする。対象リポジトリへのファイル書込み、任意shell、git commit/push、外部ネットワークアクセスを与えない。
 - Qwenが利用できるリポジトリ操作は、MCP実装が公開する限定ツール（一覧、検索、読取、`git status`、`git diff`）だけとする。
-- パスは指定workspace配下に正規化し、シンボリックリンクを含むworkspace外参照を拒否する。
+- パスは指定workspace配下に正規化し、シンボリックリンクを含むworkspace外参照を拒否する。秘密情報・VCS内部・runtime生成物など、workerに不要な領域はbridge側で遮断する。
 - Qwenの出力は提案・調査結果として扱い、変更適用、検証、最終判断は親Codexが行う。
 - モデルや推論バックエンドを追加する場合は `docs/specs/qwen-subagent.md` を先に更新する。
 
@@ -43,7 +43,7 @@
 
 ## Skill の入口
 
-- `repo-research`: 未知のリポジトリや複雑な依存関係を実装前に調査するとき。
-- `github-operations`: GitHubへの作成・同期・Issue・PR等を明示的に依頼されたとき。
+- `.agents/skills/repo-research/SKILL.md`: 未知のリポジトリや複雑な依存関係を実装前に調査するとき。
+- `.agents/skills/github-operations/SKILL.md`: GitHubへの作成・同期・Issue・PR等を明示的に依頼されたとき。
 
 GitHub操作の明示依頼がない通常のローカル開発では、GitHubへ自動的に書き込みません。

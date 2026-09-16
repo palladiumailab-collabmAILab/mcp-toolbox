@@ -27,6 +27,9 @@ if ($NCpuMoe -lt 0) {
         throw "No tuning result found. Run scripts/tune-model.ps1 first or pass -NCpuMoe."
     }
     $tuning = Get-Content -LiteralPath $tuningPath -Raw | ConvertFrom-Json
+    if ([string]$tuning.model -ne $Model) {
+        throw "Tuning result is for a different model. Retune or pass -NCpuMoe explicitly."
+    }
     $NCpuMoe = [int]$tuning.best_n_cpu_moe
 }
 
@@ -82,6 +85,29 @@ if (-not (Test-Path -LiteralPath $BaselinePath)) {
 }
 
 $baseline = Get-Content -LiteralPath $BaselinePath -Raw | ConvertFrom-Json
+$compatibilityFields = @(
+    "model",
+    "n_cpu_moe",
+    "prompt_tokens",
+    "generation_tokens",
+    "cpu_info",
+    "gpu_info"
+)
+$mismatches = @()
+foreach ($field in $compatibilityFields) {
+    $currentValue = [string]$result[$field]
+    $baselineProperty = $baseline.PSObject.Properties[$field]
+    $baselineValue = if ($null -eq $baselineProperty) { "<missing>" } else { [string]$baselineProperty.Value }
+    if ($currentValue -ne $baselineValue) {
+        $mismatches += "${field}: baseline='$baselineValue', current='$currentValue'"
+    }
+}
+if ($mismatches.Count -gt 0) {
+    $message = "Benchmark baseline is incompatible with the current run. Recreate it with -WriteBaseline."
+    $message += [Environment]::NewLine + ($mismatches -join [Environment]::NewLine)
+    throw $message
+}
+
 $ratio = 1.0 - ($MaxRegressionPercent / 100.0)
 $generationFloor = [double]$baseline.generation_tokens_per_second * $ratio
 $promptFloor = [double]$baseline.prompt_tokens_per_second * $ratio

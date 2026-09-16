@@ -10,7 +10,10 @@ DESCRIPTION_RE = re.compile(r"^description:\s*.+$", re.MULTILINE)
 
 def validate(root: Path) -> list[str]:
     errors: list[str] = []
-    for skill_file in sorted(root.glob("*/SKILL.md")):
+    skill_files = sorted(root.glob("*/SKILL.md"))
+    if not skill_files:
+        return [f"{root}: no skills found"]
+    for skill_file in skill_files:
         text = skill_file.read_text(encoding="utf-8")
         if not text.startswith("---\n"):
             errors.append(f"{skill_file}: missing YAML frontmatter")
@@ -23,7 +26,7 @@ def validate(root: Path) -> list[str]:
 
 
 def main() -> int:
-    root = Path(sys.argv[1] if len(sys.argv) > 1 else "skills")
+    root = Path(sys.argv[1] if len(sys.argv) > 1 else ".agents/skills")
     errors = validate(root)
     if errors:
         print("\n".join(errors), file=sys.stderr)
