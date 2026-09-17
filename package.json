@@ -1,0 +1,30 @@
+{
+  "name": "gemini-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "oxlint .",
+    "format:check": "oxfmt --check .",
+    "format": "oxfmt --write .",
+    "validate": "npm run format:check && npm run lint && npm run typecheck && npm test && wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.0.0",
+    "agents": "^0.20.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260916.1",
+    "@types/node": "^22.0.0",
+    "oxfmt": "^0.56.0",
+    "oxlint": "^1.71.0",
+    "typescript": "6.0.3",
+    "vitest": "^5.0.1",
+    "wrangler": "^4.105.0"
+  }
+}
