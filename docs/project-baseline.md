@@ -23,26 +23,35 @@ For this repository, the container verifies the Gemma-Jev package and MCP entry 
 
 GitHub Actions is the canonical remote quality gate for PRs and default-branch pushes.
 
-The workflow runs:
+CI installs development dependencies and invokes the same validation entry point used locally:
 
+```text
+python scripts/validate.py --docker
+```
+
+The validation script runs:
+
+- `pip check`;
 - Ruff lint;
 - Ruff format check;
 - pytest;
 - package build;
-- Docker build.
+- Docker build when `--docker` is supplied.
 
-Do not weaken or skip relevant checks merely to make a change mergeable.
+Do not duplicate this command list in CI. Do not weaken or skip relevant checks merely to make a change mergeable.
 
 ## Python baseline: Ruff
 
-Ruff is the standard lint and formatting gate:
+Ruff is the standard lint and formatting gate and is executed by the canonical validation script.
 
-```text
-python -m ruff check .
-python -m ruff format --check .
-```
+## Model asset baseline
 
-Pytest remains the behavioral test gate.
+Large model binaries are external runtime assets, not source files.
+
+- Track the exact upstream model and revision in `models/manifest.json`.
+- Materialize weights into `models/cache/`.
+- Keep weight binaries ignored by Git and Docker.
+- CI must test acquisition logic without downloading the full model.
 
 ## Architecture remains project-specific
 

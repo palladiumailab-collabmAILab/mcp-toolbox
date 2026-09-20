@@ -55,6 +55,12 @@ The MCP server reads vLLM connection configuration from environment variables:
 
 No credential may be embedded in source or committed configuration.
 
+## Model assets
+
+The production model source and revision must be version-controlled in `models/manifest.json`.
+
+Model weight binaries must not be committed to this repository. They are materialized locally under an ignored directory using the repository download script.
+
 ## Verification
 
-Unit and MCP protocol tests must not require a GPU or live model server. End-to-end DiffusionGemma latency, stability, and calibration are empirical evaluations performed against target hardware separately from the unit merge gate.
+Unit and MCP protocol tests must not require a GPU or live model server. Model asset tests must not download the full upstream model in CI. End-to-end DiffusionGemma latency, stability, and calibration are empirical evaluations performed against target hardware separately from the unit merge gate.

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "name": "diffusiongemma-26B-A4B-it",
+  "source": {
+    "provider": "huggingface",
+    "repo_id": "google/diffusiongemma-26B-A4B-it",
+    "revision": "561730da229c7b4705729030d231b686ae96c8d4"
+  },
+  "license": "apache-2.0",
+  "format": "safetensors",
+  "approx_size_gb": 51.7,
+  "weight_shards": 11,
+  "local_dir": "models/cache/diffusiongemma-26B-A4B-it"
+}

@@ -25,6 +25,28 @@ For development:
 python -m pip install -e ".[dev]"
 ~~~
 
+## Model weights
+
+The model binary is intentionally **not committed to Git**. The upstream checkpoint is roughly 51.7 GB and split into 11 safetensors shards.
+
+The exact model coordinates are tracked in `models/manifest.json`, including a pinned upstream revision.
+
+Install the optional downloader and materialize that revision locally:
+
+~~~bash
+python -m pip install -e ".[model]"
+python scripts/download_model.py --dry-run
+python scripts/download_model.py
+~~~
+
+The default destination is:
+
+~~~text
+models/cache/diffusiongemma-26B-A4B-it
+~~~
+
+That directory and common weight formats are ignored by Git and Docker. To intentionally update the model version, change and review `models/manifest.json`; do not manually copy weight binaries into the repository.
+
 ## Runtime configuration
 
 The MCP server uses:
@@ -70,8 +92,6 @@ It returns structured data:
 }
 ~~~
 
-The MCP implementation uses the current stable MCP Python SDK v2 and stdio by default.
-
 ## CLI usage
 
 ~~~bash
@@ -80,19 +100,12 @@ gemma-jev examples/decision.json --base-url http://127.0.0.1:8000
 
 ## Start DiffusionGemma with vLLM
 
-Use a vLLM build/image with DiffusionGemma support. A representative launch is:
+The tracked model manifest is the source of truth for the intended model revision. When serving directly from Hugging Face, use the same model id/revision.
+
+A representative vLLM launch is:
 
 ~~~bash
-docker run --rm --gpus all --ipc=host --network host \
-  -v ~/.cache/huggingface:/root/.cache/huggingface \
-  vllm/vllm-openai:gemma \
-  --model google/diffusiongemma-26B-A4B-it \
-  --max-num-seqs 4 \
-  --generation-config vllm \
-  --gpu-memory-utilization 0.85 \
-  --hf-overrides '{"diffusion_sampler":"entropy_bound","diffusion_entropy_bound":0.1}' \
-  --diffusion-config '{"canvas_length":256}' \
-  --host 0.0.0.0 --port 8000
+vllm serve "google/diffusiongemma-26B-A4B-it"
 ~~~
 
 DiffusionGemma is non-autoregressive at generation time, but it is not a literal one-forward-pass classifier. vLLM performs iterative denoising over a fixed canvas.
@@ -111,15 +124,19 @@ The report includes mean/median/min/max latency and selection agreement for each
 
 ## Verification
 
+After installing development dependencies, run the single canonical local gate:
+
 ~~~bash
-python -m ruff check .
-python -m ruff format --check .
-python -m pytest -q
-python -m build
-docker build -t gemma-jev:local .
+python scripts/validate.py
 ~~~
 
-The MCP test uses the SDK's in-process client and a fake completion client, so unit CI does not require a GPU or model server.
+To include the Docker build, matching CI:
+
+~~~bash
+python scripts/validate.py --docker
+~~~
+
+The MCP and model-asset tests use fake/in-process clients. CI does not require a GPU, live vLLM server, or 50+ GB model download.
 
 ## Harness
 
@@ -130,5 +147,3 @@ Repository-local engineering rules and evaluation gates are defined by:
 - `docs/harness-architecture.md`
 - `docs/specs/`
 - `skills/`
-
-See issue #2 for the harness/MCP integration acceptance criteria.

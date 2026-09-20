@@ -11,6 +11,7 @@ This repository adopts the operating model from `codex-dev-harness` with project
 - Keep CLI and MCP as adapters over the same domain implementation; do not duplicate decision logic.
 - Preserve unrelated changes. Do not use destructive reset/clean/force-push as a default recovery action.
 - Never commit credentials, tokens, private keys, `.env` files, or machine-specific secrets.
+- Do not commit model weight binaries. Track their source/revision in `models/manifest.json`.
 - Do not add unrelated frameworks, services, or broad refactors.
 
 ## Conditional guidance
@@ -30,11 +31,10 @@ Read only when relevant:
 
 For implementation changes, the canonical merge gate is:
 
-1. `python -m ruff check .`
-2. `python -m ruff format --check .`
-3. `python -m pytest -q`
-4. `python -m build`
-5. `docker build .`
-6. required GitHub Actions checks pass on the PR
+```text
+python scripts/validate.py --docker
+```
+
+The script runs dependency validation, Ruff lint/format, pytest, package build, and the optional Docker build in a fixed order.
 
 A change is not complete while required evaluation is unresolved.

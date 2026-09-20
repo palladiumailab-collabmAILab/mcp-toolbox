@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gemma-jev"
-version = "0.2.0"
+version = "0.3.0"
 description = "Jev-style shared-canvas structured decisions with DiffusionGemma"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -18,6 +18,9 @@ dev = [
     "pytest>=8",
     "ruff>=0.8",
 ]
+model = [
+    "huggingface_hub>=0.34,<2",
+]
 
 [project.scripts]
 gemma-jev = "gemma_jev.cli:main"
@@ -27,7 +30,7 @@ gemma-jev-mcp = "gemma_jev.mcp_server:main"
 where = ["src"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = [".", "src"]
 testpaths = ["tests"]
 
 [tool.ruff]

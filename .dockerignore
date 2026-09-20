@@ -7,3 +7,7 @@ __pycache__
 build
 dist
 *.egg-info
+models/cache
+*.safetensors
+*.gguf
+*.bin

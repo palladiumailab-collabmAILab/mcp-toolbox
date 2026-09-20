@@ -5,3 +5,9 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+
+# Local model materialization. Track manifests, not weight binaries.
+models/cache/
+*.safetensors
+*.gguf
+*.bin
