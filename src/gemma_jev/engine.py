@@ -3,6 +3,7 @@ from __future__ import annotations
 from time import perf_counter
 from typing import Any, Protocol
 
+from .media_policy import MediaPolicy
 from .models import DecisionRequest, DecisionResult
 from .protocol import build_messages, parse_decision
 
@@ -12,10 +13,16 @@ class CompletionClient(Protocol):
 
 
 class DecisionEngine:
-    def __init__(self, client: CompletionClient) -> None:
+    def __init__(
+        self,
+        client: CompletionClient,
+        media_policy: MediaPolicy | None = None,
+    ) -> None:
         self.client = client
+        self.media_policy = media_policy or MediaPolicy()
 
     def decide(self, request: DecisionRequest) -> DecisionResult:
+        self.media_policy.validate_urls(request.image_urls)
         messages = build_messages(request)
         started = perf_counter()
         raw = self.client.complete(messages)

@@ -55,7 +55,7 @@ Weight binaries remain ignored by Git and Docker.
 
 ## Start DiffusionGemma with vLLM
 
-Print the revision-pinned remote command:
+Print the revision-pinned command:
 
 ~~~bash
 gemma-jev-vllm --print-only
@@ -73,11 +73,30 @@ After downloading the checkpoint, serve the local files while retaining the same
 gemma-jev-vllm --local
 ~~~
 
-Additional vLLM arguments can be appended and are passed through.
-
-Current vLLM exposes `--revision` for pinned remote loading and `--served-model-name` for a stable API model name. Gemma-Jev's launcher applies both where appropriate.
+Additional vLLM arguments can be appended, except media access controls owned by Gemma-Jev (`--allowed-media-domains` and `--allowed-local-media-path`).
 
 DiffusionGemma generation is non-autoregressive, but it is **not** a literal one-forward-pass classifier. vLLM performs iterative denoising over a fixed canvas. The Gemma-Jev hypothesis is that all candidate options can be evaluated jointly within one shared request/canvas, not that the denoising process itself takes only one step.
+
+## Multimodal media security
+
+Remote images are **denied by default**. This follows vLLM's SSRF guidance for remote media fetching.
+
+To allow exact hosts, configure a comma-separated allowlist before starting both vLLM and the MCP/CLI process:
+
+~~~bash
+export GEMMA_JEV_ALLOWED_MEDIA_DOMAINS="images.example.com,cdn.example.com"
+gemma-jev-vllm
+~~~
+
+Gemma-Jev validates every `image_urls` entry against the same exact-host allowlist, and the launcher passes that allowlist to vLLM using `--allowed-media-domains`.
+
+Data image URLs are also disabled by default. Enable only when required:
+
+~~~bash
+export GEMMA_JEV_ALLOW_DATA_URLS=1
+~~~
+
+Local `file:` URLs and URL userinfo are rejected. Pass-through arguments cannot override the launcher's media-domain or local-media-path controls. Launcher-started vLLM also sets `VLLM_MEDIA_URL_ALLOW_REDIRECTS=0` unless that environment variable was explicitly set by the operator.
 
 ## Runtime configuration
 
@@ -89,6 +108,8 @@ VLLM_MODEL=google/diffusiongemma-26B-A4B-it
 VLLM_API_KEY=
 VLLM_TIMEOUT_S=60
 VLLM_MAX_TOKENS=256
+GEMMA_JEV_ALLOWED_MEDIA_DOMAINS=
+GEMMA_JEV_ALLOW_DATA_URLS=0
 ~~~
 
 The default model id is loaded from the package manifest. `VLLM_MODEL` remains an explicit override.
@@ -116,17 +137,7 @@ decide(
 status()
 ~~~
 
-A status response is operational metadata only and never returns the API key:
-
-~~~json
-{
-  "reachable": true,
-  "configured_model": "google/diffusiongemma-26B-A4B-it",
-  "served_models": ["google/diffusiongemma-26B-A4B-it"],
-  "model_available": true,
-  "error": null
-}
-~~~
+A status response is operational metadata only and never returns the API key.
 
 ## CLI usage
 

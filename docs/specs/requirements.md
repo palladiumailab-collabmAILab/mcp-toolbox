@@ -26,6 +26,19 @@ Returned decision weights are not claimed to be calibrated probabilities.
 
 CLI and MCP interfaces must call the same `DecisionEngine` implementation. Interface adapters may perform serialization and configuration but must not duplicate decision semantics.
 
+## Multimodal media policy
+
+Remote media is fail-closed.
+
+- `GEMMA_JEV_ALLOWED_MEDIA_DOMAINS` is a comma-separated exact-host allowlist.
+- An empty allowlist rejects all remote image URLs.
+- HTTP and HTTPS are the only remote URL schemes accepted.
+- URL userinfo is rejected.
+- Data image URLs are disabled by default and require `GEMMA_JEV_ALLOW_DATA_URLS=1`.
+- Local `file:` URLs are not accepted by Gemma-Jev.
+- The vLLM launcher must receive the same domain allowlist and must deny remote media when the allowlist is empty.
+- Launcher-started vLLM disables media URL redirects by default unless the environment explicitly overrides `VLLM_MEDIA_URL_ALLOW_REDIRECTS`.
+
 ## CLI
 
 The `gemma-jev` executable remains available for manual execution, debugging, and benchmarking.
@@ -53,6 +66,8 @@ The MCP server reads vLLM connection configuration from environment variables:
 - `VLLM_API_KEY`
 - `VLLM_TIMEOUT_S`
 - `VLLM_MAX_TOKENS`
+- `GEMMA_JEV_ALLOWED_MEDIA_DOMAINS`
+- `GEMMA_JEV_ALLOW_DATA_URLS`
 
 No credential may be embedded in source or committed configuration.
 
