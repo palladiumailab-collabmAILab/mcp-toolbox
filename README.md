@@ -29,7 +29,13 @@ python -m pip install -e ".[dev]"
 
 The model binary is intentionally **not committed to Git**. The upstream checkpoint is roughly 51.7 GB and split into 11 safetensors shards.
 
-The exact model coordinates are tracked in `models/manifest.json`, including a pinned upstream revision.
+The canonical model coordinates are packaged in:
+
+~~~text
+src/gemma_jev/model_manifest.json
+~~~
+
+This includes the exact Hugging Face repo id and pinned revision used by runtime defaults and the vLLM launcher.
 
 Install the optional downloader and materialize that revision locally:
 
@@ -45,7 +51,33 @@ The default destination is:
 models/cache/diffusiongemma-26B-A4B-it
 ~~~
 
-That directory and common weight formats are ignored by Git and Docker. To intentionally update the model version, change and review `models/manifest.json`; do not manually copy weight binaries into the repository.
+Weight binaries remain ignored by Git and Docker.
+
+## Start DiffusionGemma with vLLM
+
+Print the revision-pinned remote command:
+
+~~~bash
+gemma-jev-vllm --print-only
+~~~
+
+Start it directly:
+
+~~~bash
+gemma-jev-vllm
+~~~
+
+After downloading the checkpoint, serve the local files while retaining the same API model name:
+
+~~~bash
+gemma-jev-vllm --local
+~~~
+
+Additional vLLM arguments can be appended and are passed through.
+
+Current vLLM exposes `--revision` for pinned remote loading and `--served-model-name` for a stable API model name. Gemma-Jev's launcher applies both where appropriate.
+
+DiffusionGemma generation is non-autoregressive, but it is **not** a literal one-forward-pass classifier. vLLM performs iterative denoising over a fixed canvas. The Gemma-Jev hypothesis is that all candidate options can be evaluated jointly within one shared request/canvas, not that the denoising process itself takes only one step.
 
 ## Runtime configuration
 
@@ -59,6 +91,8 @@ VLLM_TIMEOUT_S=60
 VLLM_MAX_TOKENS=256
 ~~~
 
+The default model id is loaded from the package manifest. `VLLM_MODEL` remains an explicit override.
+
 Do not commit credentials.
 
 ## MCP usage
@@ -69,7 +103,7 @@ Start the local stdio server:
 gemma-jev-mcp
 ~~~
 
-Configure an MCP host to launch that command and provide the vLLM environment variables. The server exposes one tool:
+The server exposes two tools:
 
 ~~~text
 decide(
@@ -78,17 +112,19 @@ decide(
   criteria?: [string, ...],
   image_urls?: [string, ...]
 )
+
+status()
 ~~~
 
-It returns structured data:
+A status response is operational metadata only and never returns the API key:
 
 ~~~json
 {
-  "selected_option_id": "B",
-  "weights": {"A": 0.2, "B": 0.8},
-  "confidence": 0.8,
-  "rationale": "lower expected latency",
-  "latency_ms": 183.2
+  "reachable": true,
+  "configured_model": "google/diffusiongemma-26B-A4B-it",
+  "served_models": ["google/diffusiongemma-26B-A4B-it"],
+  "model_available": true,
+  "error": null
 }
 ~~~
 
@@ -97,18 +133,6 @@ It returns structured data:
 ~~~bash
 gemma-jev examples/decision.json --base-url http://127.0.0.1:8000
 ~~~
-
-## Start DiffusionGemma with vLLM
-
-The tracked model manifest is the source of truth for the intended model revision. When serving directly from Hugging Face, use the same model id/revision.
-
-A representative vLLM launch is:
-
-~~~bash
-vllm serve "google/diffusiongemma-26B-A4B-it"
-~~~
-
-DiffusionGemma is non-autoregressive at generation time, but it is not a literal one-forward-pass classifier. vLLM performs iterative denoising over a fixed canvas.
 
 ## Benchmark denoising configurations
 
@@ -120,23 +144,23 @@ PYTHONPATH=src python scripts/benchmark.py examples/decision.json \
   --trials 20
 ~~~
 
-The report includes mean/median/min/max latency and selection agreement for each server.
+The report includes mean/median/min/max latency and selection agreement for each separately launched server.
 
 ## Verification
 
-After installing development dependencies, run the single canonical local gate:
+After installing development dependencies:
 
 ~~~bash
 python scripts/validate.py
 ~~~
 
-To include the Docker build, matching CI:
+To include the Docker build, matching the Python 3.13 CI gate:
 
 ~~~bash
 python scripts/validate.py --docker
 ~~~
 
-The MCP and model-asset tests use fake/in-process clients. CI does not require a GPU, live vLLM server, or 50+ GB model download.
+CI validates Python 3.11 and 3.13, checks the built wheel contains the model manifest, and does not require a GPU, live vLLM server, or 50+ GB model download.
 
 ## Harness
 

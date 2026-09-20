@@ -11,7 +11,7 @@ This repository adopts the operating model from `codex-dev-harness` with project
 - Keep CLI and MCP as adapters over the same domain implementation; do not duplicate decision logic.
 - Preserve unrelated changes. Do not use destructive reset/clean/force-push as a default recovery action.
 - Never commit credentials, tokens, private keys, `.env` files, or machine-specific secrets.
-- Do not commit model weight binaries. Track their source/revision in `models/manifest.json`.
+- Do not commit model weight binaries. Track model source/revision in `src/gemma_jev/model_manifest.json`.
 - Do not add unrelated frameworks, services, or broad refactors.
 
 ## Conditional guidance
@@ -35,6 +35,8 @@ For implementation changes, the canonical merge gate is:
 python scripts/validate.py --docker
 ```
 
-The script runs dependency validation, Ruff lint/format, pytest, package build, and the optional Docker build in a fixed order.
+The script runs dependency validation, Ruff lint/format, pytest, package build, wheel-content verification, and the optional Docker build in a fixed order.
+
+CI runs the same non-GPU validation on Python 3.11 and 3.13; the 3.13 leg also builds Docker.
 
 A change is not complete while required evaluation is unresolved.

@@ -10,6 +10,7 @@ def test_validation_commands_share_one_ordered_gate() -> None:
     assert "ruff format --check ." in rendered[2]
     assert "pytest -q" in rendered[3]
     assert rendered[4].endswith("-m build")
+    assert rendered[5].endswith("scripts/check_wheel.py")
 
 
 def test_docker_is_optional_and_last() -> None:

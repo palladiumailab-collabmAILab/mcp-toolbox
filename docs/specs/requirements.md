@@ -37,9 +37,10 @@ The `gemma-jev-mcp` executable exposes a local MCP server.
 Requirements:
 
 - default transport is stdio;
-- the server exposes a `decide` tool;
-- the tool accepts context, options, optional criteria, and optional image URLs;
-- the tool returns structured decision data;
+- the server exposes `decide` and `status` tools;
+- `decide` accepts context, options, optional criteria, and optional image URLs;
+- `status` reports vLLM reachability, configured model, served models, and model-match state;
+- status output must never contain the configured API key;
 - importing the module must not start the server;
 - application logging must not write arbitrary text to stdout while stdio transport is active.
 
@@ -57,10 +58,16 @@ No credential may be embedded in source or committed configuration.
 
 ## Model assets
 
-The production model source and revision must be version-controlled in `models/manifest.json`.
+The production model source and revision must be version-controlled in the package-resident manifest at `src/gemma_jev/model_manifest.json`.
+
+The runtime default model id must derive from that manifest.
 
 Model weight binaries must not be committed to this repository. They are materialized locally under an ignored directory using the repository download script.
 
+The `gemma-jev-vllm` launcher must use the pinned revision for remote loading. When serving a local checkpoint it must use a stable `--served-model-name` matching the client model id.
+
 ## Verification
 
-Unit and MCP protocol tests must not require a GPU or live model server. Model asset tests must not download the full upstream model in CI. End-to-end DiffusionGemma latency, stability, and calibration are empirical evaluations performed against target hardware separately from the unit merge gate.
+Unit and MCP protocol tests must not require a GPU or live model server. Model asset tests must not download the full upstream model in CI. The built wheel must contain the model manifest.
+
+CI must validate the declared minimum Python 3.11 and Python 3.13. End-to-end DiffusionGemma latency, stability, and calibration are empirical evaluations performed against target hardware separately from the unit merge gate.

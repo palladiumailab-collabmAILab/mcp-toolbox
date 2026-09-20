@@ -16,6 +16,7 @@ def validation_commands(include_docker: bool) -> list[list[str]]:
         [python, "-m", "ruff", "format", "--check", "."],
         [python, "-m", "pytest", "-q"],
         [python, "-m", "build"],
+        [python, "scripts/check_wheel.py"],
     ]
     if include_docker:
         commands.append(["docker", "build", "-t", "gemma-jev:validation", "."])

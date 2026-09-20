@@ -2,43 +2,16 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_MANIFEST = REPO_ROOT / "models" / "manifest.json"
-
-
-@dataclass(frozen=True, slots=True)
-class DownloadSpec:
-    repo_id: str
-    revision: str
-    local_dir: Path
-
-
-def load_manifest(path: Path = DEFAULT_MANIFEST) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def resolve_download_spec(
-    manifest: dict[str, Any],
-    *,
-    repo_root: Path = REPO_ROOT,
-    local_dir_override: Path | None = None,
-) -> DownloadSpec:
-    source = manifest["source"]
-    local_dir = local_dir_override or (repo_root / manifest["local_dir"])
-    return DownloadSpec(
-        repo_id=str(source["repo_id"]),
-        revision=str(source["revision"]),
-        local_dir=local_dir,
-    )
+from gemma_jev.model_assets import ModelSpec, load_model_spec, resolve_local_model_dir
 
 
 def materialize_model(
-    spec: DownloadSpec,
+    spec: ModelSpec,
     *,
+    local_dir: Path,
     downloader: Callable[..., str] | None = None,
 ) -> str:
     if downloader is None:
@@ -50,11 +23,11 @@ def materialize_model(
             ) from exc
         downloader = snapshot_download
 
-    spec.local_dir.mkdir(parents=True, exist_ok=True)
+    local_dir.mkdir(parents=True, exist_ok=True)
     return downloader(
         repo_id=spec.repo_id,
         revision=spec.revision,
-        local_dir=str(spec.local_dir),
+        local_dir=str(local_dir),
     )
 
 
@@ -62,16 +35,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Download the revision-pinned DiffusionGemma model assets"
     )
-    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--local-dir", type=Path)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    manifest = load_manifest(args.manifest)
-    spec = resolve_download_spec(
-        manifest,
-        local_dir_override=args.local_dir,
-    )
+    spec = load_model_spec()
+    local_dir = resolve_local_model_dir(spec, override=args.local_dir)
 
     if args.dry_run:
         print(
@@ -79,14 +48,14 @@ def main() -> None:
                 {
                     "repo_id": spec.repo_id,
                     "revision": spec.revision,
-                    "local_dir": str(spec.local_dir),
+                    "local_dir": str(local_dir),
                 },
                 indent=2,
             )
         )
         return
 
-    path = materialize_model(spec)
+    path = materialize_model(spec, local_dir=local_dir)
     print(path)
 
 

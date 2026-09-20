@@ -23,11 +23,13 @@ For this repository, the container verifies the Gemma-Jev package and MCP entry 
 
 GitHub Actions is the canonical remote quality gate for PRs and default-branch pushes.
 
-CI installs development dependencies and invokes the same validation entry point used locally:
+CI invokes the same validation entry point used locally:
 
 ```text
-python scripts/validate.py --docker
+python scripts/validate.py
 ```
+
+The Python 3.13 CI leg adds `--docker`.
 
 The validation script runs:
 
@@ -36,9 +38,12 @@ The validation script runs:
 - Ruff format check;
 - pytest;
 - package build;
+- built-wheel manifest verification;
 - Docker build when `--docker` is supplied.
 
-Do not duplicate this command list in CI. Do not weaken or skip relevant checks merely to make a change mergeable.
+CI validates both the declared minimum Python 3.11 and Python 3.13.
+
+Do not duplicate the underlying check list in CI. Do not weaken or skip relevant checks merely to make a change mergeable.
 
 ## Python baseline: Ruff
 
@@ -48,10 +53,12 @@ Ruff is the standard lint and formatting gate and is executed by the canonical v
 
 Large model binaries are external runtime assets, not source files.
 
-- Track the exact upstream model and revision in `models/manifest.json`.
+- The package-resident source of truth is `src/gemma_jev/model_manifest.json`.
+- Runtime defaults and vLLM launcher configuration derive from that manifest.
 - Materialize weights into `models/cache/`.
 - Keep weight binaries ignored by Git and Docker.
-- CI must test acquisition logic without downloading the full model.
+- CI tests acquisition and launcher logic without downloading the full model.
+- The built wheel must contain the model manifest.
 
 ## Architecture remains project-specific
 

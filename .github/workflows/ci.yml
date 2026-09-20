@@ -12,18 +12,26 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.11"
+            docker-flag: ""
+          - python-version: "3.13"
+            docker-flag: "--docker"
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python-version }}
           cache: pip
 
       - name: Install project and development dependencies
         run: python -m pip install --disable-pip-version-check -e ".[dev]"
 
       - name: Run canonical validation
-        run: python scripts/validate.py --docker
+        run: python scripts/validate.py ${{ matrix.docker-flag }}
