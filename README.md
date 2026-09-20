@@ -145,17 +145,34 @@ A status response is operational metadata only and never returns the API key.
 gemma-jev examples/decision.json --base-url http://127.0.0.1:8000
 ~~~
 
-## Benchmark denoising configurations
+## Reproducible benchmark evidence
+
+Run separately configured vLLM servers and record one durable JSON artifact:
 
 ~~~bash
 PYTHONPATH=src python scripts/benchmark.py examples/decision.json \
   --target steps8,http://127.0.0.1:8008,8 \
   --target steps16,http://127.0.0.1:8016,16 \
   --target steps48,http://127.0.0.1:8048,48 \
-  --trials 20
+  --trials 20 \
+  --output benchmark-report.json
 ~~~
 
-The report includes mean/median/min/max latency and selection agreement for each separately launched server.
+The third target field is stored as `declared_denoising_steps`. It is operator-supplied metadata and is **not** treated as server-verified configuration.
+
+Before trials, the benchmark checks each target's OpenAI-compatible `/v1/models` response and requires the configured model to be served. `--skip-model-check` is available only as an explicit escape hatch.
+
+The report records:
+
+- schema version and UTC generation time;
+- packaged model repo id and pinned revision;
+- configured API model id;
+- canonical decision payload and SHA-256 fingerprint;
+- target status and declared denoising-step metadata;
+- every trial's selected option, normalized weights, and latency;
+- latency summary, selection agreement, selection counts, and per-option weight mean/stdev/min/max.
+
+This makes future GPU results auditable but does **not** itself establish DiffusionGemma performance or probability calibration.
 
 ## Verification
 

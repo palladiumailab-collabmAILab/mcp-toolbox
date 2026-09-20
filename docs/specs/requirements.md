@@ -81,6 +81,20 @@ Model weight binaries must not be committed to this repository. They are materia
 
 The `gemma-jev-vllm` launcher must use the pinned revision for remote loading. When serving a local checkpoint it must use a stable `--served-model-name` matching the client model id.
 
+## Benchmark evidence
+
+A live benchmark report must preserve enough provenance to be reviewable.
+
+- The report schema is versioned.
+- It records the package manifest model repo id and pinned revision.
+- It records the configured API model id.
+- It records a SHA-256 fingerprint of the canonical decision payload.
+- It checks the configured model against the target `/v1/models` response by default.
+- Operator-supplied denoising steps are labeled `declared_denoising_steps` and are not represented as server-verified.
+- Raw trial selected option, normalized weights, and latency are retained.
+- Aggregate latency, selection agreement, selection counts, and per-option weight stability are retained.
+- Benchmark evidence must not be interpreted as calibrated probability evidence without a separate calibration study.
+
 ## Verification
 
 Unit and MCP protocol tests must not require a GPU or live model server. Model asset tests must not download the full upstream model in CI. The built wheel must contain the model manifest.
