@@ -1,0 +1,9 @@
+{
+  "context": "Choose a deployment strategy for a latency-sensitive internal decision service.",
+  "criteria": ["latency", "operational simplicity", "reproducibility"],
+  "options": [
+    {"id": "A", "text": "Run one local vLLM DiffusionGemma server."},
+    {"id": "B", "text": "Use a remote managed autoregressive model endpoint."},
+    {"id": "C", "text": "Use a two-stage router plus specialist models."}
+  ]
+}
