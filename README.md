@@ -24,6 +24,7 @@ The default model is `gemini-3.5-flash-lite`; callers may select `gemini-3.8-fla
 npm install
 cp .env.example .dev.vars
 # edit .dev.vars; never commit it
+# For local-only no-token testing, set ALLOW_UNAUTHENTICATED=1.
 npm run dev
 ```
 
@@ -47,6 +48,8 @@ npx wrangler secret put MCP_BEARER_TOKEN
 npm run deploy
 ```
 
+`npm run deploy` first verifies that both Worker secrets exist and refuses to deploy if either is missing. The GitHub Actions deployment workflow performs the same preflight with the configured Cloudflare credentials.
+
 Or add repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, then run the `Deploy Worker` GitHub Actions workflow. `GEMINI_API_KEY` and `MCP_BEARER_TOKEN` remain Worker secrets and must be provisioned separately.
 
 After deployment:
@@ -62,4 +65,4 @@ This is a standard remote MCP server. ChatGPT can use custom MCP apps only on pl
 
 ## Security
 
-Do not deploy the Gemini-backed MCP endpoint publicly without access control. Set `MCP_BEARER_TOKEN` for clients that support static bearer authentication. If a target MCP host requires OAuth, add an OAuth layer before exposing the service to that host.
+The `/mcp` endpoint fails closed when `MCP_BEARER_TOKEN` is missing: remote requests receive `503`, and requests with a missing or wrong token receive `401`. The only unauthenticated mode is an explicit `ALLOW_UNAUTHENTICATED=1` setting on a loopback request (`localhost`, `127.0.0.1`, or `::1`). If a target MCP host requires OAuth, add an OAuth layer before exposing the service to that host.

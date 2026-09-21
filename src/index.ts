@@ -9,10 +9,11 @@ import {
   type SupportedGeminiModel,
 } from "./gemini";
 
-interface Env {
+export interface Env {
   GEMINI_API_KEY: string;
   GEMINI_MODEL?: SupportedGeminiModel;
   MCP_BEARER_TOKEN?: string;
+  ALLOW_UNAUTHENTICATED?: string;
 }
 
 const promptSchema = z
@@ -23,11 +24,66 @@ const promptSchema = z
     "Prompt to send to Gemini. Do not include secrets unless the user explicitly requests it.",
   );
 
-function isAuthorized(request: Request, env: Env): boolean {
-  if (!env.MCP_BEARER_TOKEN) {
-    return true;
+const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+function isLoopbackRequest(request: Request): boolean {
+  return LOOPBACK_HOSTNAMES.has(new URL(request.url).hostname);
+}
+
+export function tokensMatch(provided: string, expected: string): boolean {
+  const providedBytes = new TextEncoder().encode(provided);
+  const expectedBytes = new TextEncoder().encode(expected);
+  const length = Math.max(providedBytes.length, expectedBytes.length);
+  let difference = providedBytes.length ^ expectedBytes.length;
+
+  for (let index = 0; index < length; index += 1) {
+    difference |= (providedBytes[index] ?? 0) ^ (expectedBytes[index] ?? 0);
   }
-  return request.headers.get("authorization") === `Bearer ${env.MCP_BEARER_TOKEN}`;
+
+  return difference === 0;
+}
+
+export function allowsLocalUnauthenticated(request: Request, env: Env): boolean {
+  return env.ALLOW_UNAUTHENTICATED === "1" && isLoopbackRequest(request);
+}
+
+export function isAuthorized(request: Request, env: Env): boolean {
+  if (!env.MCP_BEARER_TOKEN) {
+    return allowsLocalUnauthenticated(request, env);
+  }
+
+  return tokensMatch(request.headers.get("authorization") ?? "", `Bearer ${env.MCP_BEARER_TOKEN}`);
+}
+
+export function getAuthenticationFailure(request: Request, env: Env): Response | null {
+  if (!env.MCP_BEARER_TOKEN && !allowsLocalUnauthenticated(request, env)) {
+    return Response.json(
+      { error: "MCP authentication is not configured" },
+      { status: 503, headers: { "cache-control": "no-store" } },
+    );
+  }
+
+  if (!isAuthorized(request, env)) {
+    return new Response("Unauthorized", {
+      status: 401,
+      headers: {
+        "cache-control": "no-store",
+        "www-authenticate": 'Bearer realm="gemini-mcp"',
+      },
+    });
+  }
+
+  return null;
+}
+
+function authenticationMode(request: Request, env: Env): "bearer" | "local-opt-in" | "required" {
+  if (env.MCP_BEARER_TOKEN) {
+    return "bearer";
+  }
+  if (allowsLocalUnauthenticated(request, env)) {
+    return "local-opt-in";
+  }
+  return "required";
 }
 
 function createServer(env: Env): McpServer {
@@ -78,7 +134,7 @@ export default {
         ok: true,
         service: "gemini-mcp",
         defaultModel: env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL,
-        authentication: env.MCP_BEARER_TOKEN ? "bearer" : "none",
+        authentication: authenticationMode(request, env),
       });
     }
 
@@ -86,15 +142,16 @@ export default {
       return new Response("Not Found", { status: 404 });
     }
 
-    if (!env.GEMINI_API_KEY) {
-      return Response.json({ error: "GEMINI_API_KEY is not configured" }, { status: 503 });
+    const authenticationFailure = getAuthenticationFailure(request, env);
+    if (authenticationFailure) {
+      return authenticationFailure;
     }
 
-    if (!isAuthorized(request, env)) {
-      return new Response("Unauthorized", {
-        status: 401,
-        headers: { "www-authenticate": 'Bearer realm="gemini-mcp"' },
-      });
+    if (!env.GEMINI_API_KEY) {
+      return Response.json(
+        { error: "GEMINI_API_KEY is not configured" },
+        { status: 503, headers: { "cache-control": "no-store" } },
+      );
     }
 
     const handler = createMcpHandler(() => createServer(env));

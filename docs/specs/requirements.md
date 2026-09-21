@@ -13,13 +13,15 @@ Expose a small remote MCP server on Cloudflare Workers that delegates selected t
 5. Return Gemini's text output to the MCP client without adding model-generated text of our own.
 6. Expose `/health` without disclosing secrets.
 7. Read the Gemini API key only from the Worker secret `GEMINI_API_KEY`.
-8. If `MCP_BEARER_TOKEN` is configured, require `Authorization: Bearer <token>` on `/mcp`.
+8. Require `Authorization: Bearer <token>` on remote `/mcp` requests; if `MCP_BEARER_TOKEN` is missing, return `503` instead of allowing anonymous access.
+9. Allow unauthenticated `/mcp` access only when `ALLOW_UNAUTHENTICATED=1` and the request hostname is loopback for local development.
 
 ## Non-functional requirements
 
 - Target Cloudflare Workers and current stateless Streamable HTTP MCP handling.
 - Keep the server stateless; no Durable Object or database is required.
 - Do not log or return secret values.
+- Require a deployment preflight to confirm `GEMINI_API_KEY` and `MCP_BEARER_TOKEN` Worker secrets exist.
 - Keep the implementation small enough for the Workers Free plan's lightweight request model; Gemini network wait time is external I/O.
 - Provide Docker, GitHub Actions validation, and a manual deployment workflow.
 
