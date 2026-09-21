@@ -9,7 +9,7 @@ The server exposes text-to-image generation, image editing with up to 10 local r
 | Tool | Purpose |
 | --- | --- |
 | `qwen_image_generate` | Generate an image from text. Supports official 2K aspect-ratio presets and transparent PNG prompting. |
-| `qwen_image_edit` | Edit or compose from 1-10 local reference images. |
+| `qwen_image_edit` | Edit or compose from 1-10 local reference images; preserves the source aspect ratio by default. |
 | `qwen_image_status` | Report configuration, dependency presence, output directory, and whether the model is loaded. |
 
 ## Install
@@ -62,7 +62,7 @@ Generated files are PNGs. Reference images are passed as local filesystem paths 
 
 ## Aspect ratios
 
-The built-in presets match the upstream recommended 2K sizes:
+Generation defaults to `1:1`. Editing defaults to `source`, which leaves width and height unset so the pipeline derives them from the condition image. Explicit presets match the upstream recommended 2K sizes:
 
 - `1:1`: 2048x2048
 - `4:3`: 2400x1792
