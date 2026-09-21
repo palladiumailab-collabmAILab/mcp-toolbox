@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+dist/
+build/
+*.egg-info/
+
+# Local model materialization. Track manifests, not weight binaries.
+models/cache/
+*.safetensors
+*.gguf
+*.bin

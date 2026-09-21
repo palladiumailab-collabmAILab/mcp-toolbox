@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "vllm_version": "0.29.0",
+  "python": {
+    "minimum": "3.11",
+    "maximum_exclusive": "3.14"
+  },
+  "platform": {
+    "os": "Linux",
+    "architecture": "x86_64"
+  },
+  "gpu": {
+    "vendor": "NVIDIA",
+    "cuda": "13.0",
+    "compute_capability_min": "7.5"
+  },
+  "model_support": {
+    "architecture": "DiffusionGemma",
+    "model_revision": "561730da229c7b4705729030d231b686ae96c8d4"
+  },
+  "notes": [
+    "vLLM 0.29.0 is the pinned release with the DiffusionGemma runtime path used by this project.",
+    "The prebuilt NVIDIA wheel targets CUDA 13.0; follow vLLM's driver compatibility guidance.",
+    "The 51.7 GB checkpoint requires a suitable GPU-memory or tensor-parallel deployment."
+  ]
+}

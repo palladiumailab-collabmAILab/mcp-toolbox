@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gemma-jev"
+version = "0.6.0"
+description = "Jev-style shared-canvas structured decisions with DiffusionGemma"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=2,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.2",
+    "pytest>=8",
+    "ruff>=0.8",
+]
+model = [
+    "huggingface_hub>=0.34,<2",
+]
+serve = [
+    "vllm==0.29.0",
+]
+
+[project.scripts]
+gemma-jev = "gemma_jev.cli:main"
+gemma-jev-mcp = "gemma_jev.mcp_server:main"
+gemma-jev-vllm = "gemma_jev.serve:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+gemma_jev = ["model_manifest.json", "vllm_compatibility.json"]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

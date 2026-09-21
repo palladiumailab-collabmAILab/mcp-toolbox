@@ -1,0 +1,106 @@
+# Gemma-Jev requirements
+
+## Purpose
+
+Gemma-Jev exposes a compact structured decision layer over a DiffusionGemma model served through an OpenAI-compatible vLLM endpoint.
+
+## Core decision contract
+
+A decision request contains:
+
+- free-form context;
+- at least two options with unique non-empty ids and non-empty text;
+- optional decision criteria;
+- optional image URLs.
+
+A decision result contains:
+
+- one selected option id;
+- one normalized non-negative decision weight for every supplied option;
+- a concise rationale;
+- measured model-request latency.
+
+Returned decision weights are not claimed to be calibrated probabilities.
+
+## Shared decision engine
+
+CLI and MCP interfaces must call the same `DecisionEngine` implementation. Interface adapters may perform serialization and configuration but must not duplicate decision semantics.
+
+## Multimodal media policy
+
+Remote media is fail-closed.
+
+- `GEMMA_JEV_ALLOWED_MEDIA_DOMAINS` is a comma-separated exact-host allowlist.
+- An empty allowlist rejects all remote image URLs.
+- HTTP and HTTPS are the only remote URL schemes accepted.
+- URL userinfo is rejected.
+- Data image URLs are disabled by default and require `GEMMA_JEV_ALLOW_DATA_URLS=1`.
+- Local `file:` URLs are not accepted by Gemma-Jev.
+- The vLLM launcher must receive the same domain allowlist and must deny remote media when the allowlist is empty.
+- Launcher-started vLLM disables media URL redirects by default unless the environment explicitly overrides `VLLM_MEDIA_URL_ALLOW_REDIRECTS`.
+
+## CLI
+
+The `gemma-jev` executable remains available for manual execution, debugging, and benchmarking.
+
+## MCP
+
+The `gemma-jev-mcp` executable exposes a local MCP server.
+
+Requirements:
+
+- default transport is stdio;
+- the server exposes `decide` and `status` tools;
+- `decide` accepts context, options, optional criteria, and optional image URLs;
+- `status` reports vLLM reachability, configured model, served models, and model-match state;
+- status output must never contain the configured API key;
+- importing the module must not start the server;
+- application logging must not write arbitrary text to stdout while stdio transport is active.
+
+## Runtime configuration
+
+The MCP server reads vLLM connection configuration from environment variables:
+
+- `VLLM_BASE_URL`
+- `VLLM_MODEL`
+- `VLLM_API_KEY`
+- `VLLM_TIMEOUT_S`
+- `VLLM_MAX_TOKENS`
+- `GEMMA_JEV_ALLOWED_MEDIA_DOMAINS`
+- `GEMMA_JEV_ALLOW_DATA_URLS`
+
+No credential may be embedded in source or committed configuration.
+
+## Model assets
+
+The production model source and revision must be version-controlled in the package-resident manifest at `src/gemma_jev/model_manifest.json`.
+
+The runtime default model id must derive from that manifest.
+
+Model weight binaries must not be committed to this repository. They are materialized locally under an ignored directory using the repository download script.
+
+The `gemma-jev-vllm` launcher must use the pinned revision for remote loading. When serving a local checkpoint it must use a stable `--served-model-name` matching the client model id.
+
+## vLLM runtime
+
+The serving extra must install the exact vLLM version declared in `src/gemma_jev/vllm_compatibility.json`. The launcher must preflight the Python range and the installed `vllm --version` before starting a server, and must provide an actionable error when the executable is missing or incompatible. CPU-only validation must cover this contract without downloading vLLM or model weights.
+
+## Benchmark evidence
+
+A live benchmark report must preserve enough provenance to be reviewable.
+
+- The report schema is versioned.
+- It records the package manifest model repo id and pinned revision.
+- It records the configured API model id.
+- It records a SHA-256 fingerprint of the canonical decision payload.
+- It checks the configured model against the target `/v1/models` response by default.
+- Operator-supplied denoising steps are labeled `declared_denoising_steps` and are not represented as server-verified.
+- Raw trial selected option, normalized weights, and latency are retained.
+- Aggregate latency, selection agreement, selection counts, and per-option weight stability are retained.
+- Benchmark evidence must not be interpreted as calibrated probability evidence without a separate calibration study.
+
+## Verification
+
+Unit and MCP protocol tests must not require a GPU or live model server. Model asset tests must not download the full upstream model in CI. The built wheel must contain the model manifest.
+
+CI must validate the declared minimum Python 3.11 and Python 3.13. End-to-end DiffusionGemma latency, stability, and calibration are empirical evaluations performed against target hardware separately from the unit merge gate.
