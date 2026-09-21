@@ -70,6 +70,20 @@ def test_edit_passes_multiple_reference_images(tmp_path: Path) -> None:
     assert result["reference_image_count"] == 2
 
 
+def test_edit_preserves_source_aspect_ratio_by_default(tmp_path: Path) -> None:
+    pipeline = FakePipeline()
+    engine = build_engine(tmp_path, pipeline)
+
+    result = engine.edit("edit it", ["source.png"])
+
+    call = pipeline.calls[0]
+    assert "width" not in call
+    assert "height" not in call
+    assert result["aspect_ratio"] == "source"
+    assert result["width"] is None
+    assert result["height"] is None
+
+
 @pytest.mark.parametrize("count", [0, 11])
 def test_edit_rejects_invalid_reference_count(tmp_path: Path, count: int) -> None:
     engine = build_engine(tmp_path, FakePipeline())
