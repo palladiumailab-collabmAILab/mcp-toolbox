@@ -1,10 +1,22 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+
+class ResponseLike(Protocol):
+    def __enter__(self) -> "ResponseLike": ...
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> object: ...
+
+    def read(self) -> bytes: ...
+
+
+UrlOpener = Callable[..., ResponseLike]
 
 
 @dataclass(slots=True)
@@ -15,6 +27,7 @@ class VLLMClient:
     timeout_s: float = 60.0
     max_tokens: int = 256
     extra_body: dict[str, Any] = field(default_factory=dict)
+    opener: UrlOpener = field(default=urlopen, repr=False)
 
     def _v1_url(self, path: str) -> str:
         base = self.base_url.rstrip("/")
@@ -46,7 +59,7 @@ class VLLMClient:
             method="POST",
         )
         try:
-            with urlopen(request, timeout=self.timeout_s) as response:
+            with self.opener(request, timeout=self.timeout_s) as response:
                 body = json.loads(response.read().decode("utf-8"))
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
@@ -69,7 +82,7 @@ class VLLMClient:
             method="GET",
         )
         try:
-            with urlopen(request, timeout=self.timeout_s) as response:
+            with self.opener(request, timeout=self.timeout_s) as response:
                 body = json.loads(response.read().decode("utf-8"))
         except HTTPError as exc:
             return {
