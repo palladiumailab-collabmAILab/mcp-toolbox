@@ -166,7 +166,7 @@ class QwenImageEngine:
 
         pipeline = QwenImage21Pipeline.from_pretrained(
             self.model_id,
-            torch_dtype=torch_dtype,
+            dtype=torch_dtype,
         )
         self._pipeline = pipeline.to(self.device)
         return self._pipeline
