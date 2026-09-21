@@ -1,0 +1,26 @@
+# Secrets and local runtime configuration
+.env
+.env.*
+!.env.example
+.dev.vars
+!.dev.vars.example
+
+# Local model/runtime state
+.local/
+models/cache/
+**/models/cache/
+**/.venv/
+**/node_modules/
+**/dist/
+**/coverage/
+**/.wrangler/
+
+# Generated reports and build artifacts
+benchmark-report.json
+**/*.egg-info/
+**/build/
+**/wheelhouse/
+
+# Local package-manager artifacts created during migration
+package-lock.json
+pnpm-lock.yaml

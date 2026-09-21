@@ -1,0 +1,111 @@
+name: MCP Toolbox CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  qwen:
+    name: Qwen MCP bridge
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: servers/qwen-coder-subagent-mcp
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: servers/qwen-coder-subagent-mcp/pyproject.toml
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - name: Ruff
+        run: |
+          python -m ruff check .
+          python -m ruff format --check .
+      - name: Test and compile
+        run: |
+          python -m pytest -q
+          python -m compileall -q src
+      - name: Validate PowerShell syntax
+        shell: pwsh
+        run: |
+          $failed = $false
+          Get-ChildItem scripts -Filter '*.ps1' | ForEach-Object {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref]$tokens,
+              [ref]$parseErrors
+            ) | Out-Null
+            if ($parseErrors.Count -gt 0) { $failed = $true }
+          }
+          if ($failed) { exit 1 }
+      - name: Build Docker image
+        run: docker build -t qwen-coder-subagent-mcp:test .
+
+  gemini:
+    name: Gemini remote MCP
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: servers/gemini-mcp
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+      - name: Validate
+        run: npm run validate
+      - name: Build Docker image
+        run: docker build -t gemini-mcp:ci .
+
+  jev:
+    name: Jev remote MCP
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: servers/jev-cloudflare
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+      - name: Validate
+        run: npm run check
+
+  gemma:
+    name: Gemma-Jev (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.11"
+            docker-flag: ""
+          - python-version: "3.13"
+            docker-flag: "--docker"
+    defaults:
+      run:
+        working-directory: servers/gemma-jev
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: servers/gemma-jev/pyproject.toml
+      - name: Install project and development dependencies
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - name: Run canonical validation
+        run: python scripts/validate.py ${{ matrix.docker-flag }}
