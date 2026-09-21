@@ -10,6 +10,7 @@ MCPサーバー、ローカルMCPブリッジ、モデル連携ツールを一�
 | [`gemini-mcp`](servers/gemini-mcp/) | リモートMCP | `ask_gemini` | Cloudflare Workers / Gemini API |
 | [`jev-cloudflare`](servers/jev-cloudflare/) | リモートMCP | `jev_evaluate` | Cloudflare Workers AI / TypeSafe Jev |
 | [`gemma-jev`](servers/gemma-jev/) | ローカルstdioサーバー | `decide`, `status` | Python / vLLM / DiffusionGemma |
+| [`qwen-image-mcp`](servers/qwen-image-mcp/) | ローカルstdioサーバー | `qwen_image_generate`, `qwen_image_edit`, `qwen_image_status` | Python / Diffusers / Qwen-Image-2.1 |
 
 各サービスは独立した依存関係・設定・検証手順を維持し、ルートのGitHub Actionsがまとめて品質ゲートを実行します。モデル重み、APIキー、Cloudflareシークレットはリポジトリに含めません。
 
@@ -21,9 +22,10 @@ mcp-toolbox/
 │   ├── qwen-coder-subagent-mcp/
 │   ├── gemini-mcp/
 │   ├── jev-cloudflare/
-│   └── gemma-jev/
+│   ├── gemma-jev/
+│   └── qwen-image-mcp/
 ├── .github/workflows/
-│   ├── ci.yml              # 4サービスの検証
+│   ├── ci.yml              # 5サービスの検証
 │   ├── deploy-gemini.yml   # Gemini Workerの手動デプロイ
 │   └── deploy-jev.yml      # Jev Workerの手動デプロイ
 └── README.md
@@ -55,6 +57,13 @@ npm run check
 # Gemma-Jev（GPU・モデル重み不要の品質ゲート）
 Set-Location ../gemma-jev
 python scripts/validate.py
+
+# Qwen-Image-2.1（実モデルは任意依存、CIでは未ロード）
+Set-Location ../qwen-image-mcp
+python -m ruff check .
+python -m ruff format --check .
+python -m pytest -q
+python -m compileall -q src
 ```
 
 ## デプロイ
@@ -71,7 +80,7 @@ Cloudflare Workerはサービスごとに独立してデプロイします。Git
 
 初回のActionsデプロイ前に、各WorkerのランタイムシークレットをWranglerまたはCloudflare Dashboardで個別に登録してください。Geminiは必須シークレットが未登録の場合、デプロイ前検査で停止します。Jevはシークレットが未登録でもWorker自体は配置できますが、`/mcp` は設定完了まで `503` を返します。
 
-QwenとGemma-Jevはローカルstdio MCPであり、GPU・モデル・ローカル環境を必要とするため、ルートのCIではライブモデル起動やモデルダウンロードを行いません。
+Qwen Coder、Qwen-Image-2.1、Gemma-Jevはローカルstdio MCPです。GPU・モデル・ローカル環境を必要とするライブ推論は、ルートCIでは実行せず、モデルダウンロードも行いません。
 
 ## 統合方針
 
