@@ -28,6 +28,8 @@ mcp-toolbox/
 └── README.md
 ```
 
+移行時点の未完了な実環境検証は [`docs/migration.md`](docs/migration.md) に記録しています。
+
 ## ローカル検証
 
 サービスごとの正本手順は各ディレクトリのREADMEとAGENTSを参照してください。
