@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qwen-image-mcp"
-version = "0.1.0"
-description = "Local stdio MCP server for Qwen-Image-2.1 generation and editing"
+version = "0.2.0"
+description = "Local stdio MCP server for 4-bit Qwen-Image-2.1 generation and editing"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -21,6 +21,7 @@ model = [
   "torch>=2.4",
   "transformers>=5.17",
   "accelerate>=1",
+  "bitsandbytes>=0.45",
   "pillow>=10",
   "diffusers @ git+https://github.com/huggingface/diffusers.git",
 ]

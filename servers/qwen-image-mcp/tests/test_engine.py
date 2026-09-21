@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from qwen_image_mcp.engine import QwenImageEngine
+from qwen_image_mcp.engine import QwenImageEngine, _env_bool
 
 
 class FakeImage:
@@ -18,6 +18,11 @@ class FakePipeline:
     def __call__(self, **kwargs):
         self.calls.append(kwargs)
         return SimpleNamespace(images=[FakeImage()])
+
+
+class FakeQuantizationConfig:
+    def __init__(self, **kwargs) -> None:
+        self.kwargs = kwargs
 
 
 def build_engine(tmp_path: Path, pipeline: FakePipeline) -> QwenImageEngine:
@@ -47,6 +52,7 @@ def test_generate_uses_official_size_and_transparency_prompt(tmp_path: Path) -> 
     assert call["num_inference_steps"] == 40
     assert call["generator"] == "generator:7"
     assert call["prompt"].startswith("This is an RGBA image with transparency.")
+    assert result["quantization"]["backend"] == "bitsandbytes_4bit"
     assert Path(result["path"]).name == "robot.png"
     assert Path(result["path"]).read_bytes() == b"fake-png"
 
@@ -97,8 +103,41 @@ def test_invalid_aspect_ratio_is_rejected(tmp_path: Path) -> None:
         engine.generate("test", aspect_ratio="5:4")
 
 
-def test_status_reports_injected_pipeline_as_loaded(tmp_path: Path) -> None:
+def test_status_reports_nf4_quantization(tmp_path: Path) -> None:
     engine = build_engine(tmp_path, FakePipeline())
     status = engine.status()
     assert status["model_id"] == "Qwen/Qwen-Image-2.1"
     assert status["model_loaded"] is True
+    assert status["quantization_backend"] == "bitsandbytes_4bit"
+    assert status["quantization_type"] == "nf4"
+    assert status["quantized_components"] == ["transformer", "text_encoder"]
+
+
+def test_build_quantization_config_quantizes_both_large_components(tmp_path: Path) -> None:
+    engine = build_engine(tmp_path, FakePipeline())
+    config = engine._build_quantization_config(FakeQuantizationConfig, "bf16")
+
+    assert config.kwargs["quant_backend"] == "bitsandbytes_4bit"
+    assert config.kwargs["components_to_quantize"] == ["transformer", "text_encoder"]
+    assert config.kwargs["quant_kwargs"] == {
+        "load_in_4bit": True,
+        "bnb_4bit_quant_type": "nf4",
+        "bnb_4bit_compute_dtype": "bf16",
+        "bnb_4bit_use_double_quant": False,
+    }
+
+
+def test_from_env_reads_quantization_options(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("QWEN_IMAGE_QUANT_TYPE", "fp4")
+    monkeypatch.setenv("QWEN_IMAGE_DOUBLE_QUANT", "true")
+
+    engine = QwenImageEngine.from_env()
+
+    assert engine.quant_type == "fp4"
+    assert engine.double_quant is True
+
+
+def test_env_bool_rejects_invalid_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("QWEN_IMAGE_DOUBLE_QUANT", "sometimes")
+    with pytest.raises(ValueError, match="must be a boolean"):
+        _env_bool("QWEN_IMAGE_DOUBLE_QUANT", default=False)
