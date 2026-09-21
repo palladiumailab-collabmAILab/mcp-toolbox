@@ -22,3 +22,4 @@ Maintain the Qwen coding subagent MCP and its constrained repository-access brid
 - OpenAI bounded worker: `gpt-5.6-luna / max`.
 - Local read-only worker: `Qwen3-Coder-30B-A3B-Instruct Q4_K_M`.
 - Do not finalize a change from the local worker's conclusion alone; the parent must inspect the diff and verification evidence.
+- `QWEN_ALLOWED_WORKSPACE_ROOTS` に明示された top-level Git worktree だけを delegated workspace として許可する。未設定、home、兄弟repo、非Gitディレクトリは default deny とする。
