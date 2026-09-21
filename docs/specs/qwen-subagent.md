@@ -36,7 +36,7 @@ Checks whether the configured llama.cpp endpoint responds and reports the config
 Inputs:
 
 - `task`: bounded coding/repository research task.
-- `workspace`: absolute or relative repository root accessible to the MCP process.
+- `workspace`: an absolute or relative repository root that exactly matches one of the allowlisted top-level Git worktrees configured through `QWEN_ALLOWED_WORKSPACE_ROOTS`.
 - `max_rounds`: optional upper bound on local-agent tool iterations.
 
 Behavior:
@@ -50,7 +50,7 @@ Behavior:
 
 ## Security boundary
 
-Every path is resolved against the workspace root. Requests escaping the workspace, including through existing symlinks, are rejected. VCS internals, virtual environments, build/runtime artifacts, local model storage, `.local/`, and common secret files such as `.env` are excluded from the worker surface.
+Every path is resolved against the workspace root. Requests escaping the workspace, including through existing symlinks, are rejected. The workspace itself is default-deny: it must be explicitly allowlisted and verified as a top-level Git worktree. VCS internals, virtual environments, build/runtime artifacts, local model storage, `.local/`, cloud credential directories, private-key files, and common secret files such as `.env` are excluded from the worker surface.
 
 Repository inspection subprocesses are fixed and non-shell. Git status runs with optional locking/index refresh disabled and fsmonitor disabled. Git diff explicitly disables external diff and textconv filters. Submodules are ignored by these inspection commands. Tool inputs and outputs are bounded before being returned to the model.
 

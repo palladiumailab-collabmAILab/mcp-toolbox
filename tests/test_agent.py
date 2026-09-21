@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -5,6 +6,15 @@ import pytest
 
 from qwen_mcp.agent import run_agent
 from qwen_mcp.config import Settings
+
+
+def _git_workspace(path: Path) -> Path:
+    subprocess.run(["git", "-C", str(path), "init"], check=True, capture_output=True, text=True)
+    return path
+
+
+def _settings(workspace: Path, max_rounds: int) -> Settings:
+    return Settings(max_rounds=max_rounds, allowed_workspace_roots=(str(workspace),))
 
 
 class FakeClient:
@@ -77,11 +87,12 @@ class StaticClient:
 
 @pytest.mark.asyncio
 async def test_agent_executes_read_only_tool_loop(tmp_path: Path) -> None:
-    (tmp_path / "example.py").write_text("print('ok')\n", encoding="utf-8")
+    workspace = _git_workspace(tmp_path)
+    (workspace / "example.py").write_text("print('ok')\n", encoding="utf-8")
     result = await run_agent(
         "Locate the implementation",
-        str(tmp_path),
-        settings=Settings(max_rounds=4),
+        str(workspace),
+        settings=_settings(workspace, 4),
         client=FakeClient(),
     )
 
@@ -96,11 +107,12 @@ async def test_agent_executes_read_only_tool_loop(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_agent_normalizes_legacy_tool_and_answer_envelopes(tmp_path: Path) -> None:
-    (tmp_path / "example.py").write_text("print('ok')\n", encoding="utf-8")
+    workspace = _git_workspace(tmp_path)
+    (workspace / "example.py").write_text("print('ok')\n", encoding="utf-8")
     result = await run_agent(
         "Locate the implementation",
-        str(tmp_path),
-        settings=Settings(max_rounds=4),
+        str(workspace),
+        settings=_settings(workspace, 4),
         client=LegacyToolClient(),
     )
 
@@ -115,11 +127,12 @@ async def test_agent_normalizes_legacy_tool_and_answer_envelopes(tmp_path: Path)
 
 @pytest.mark.asyncio
 async def test_agent_rejects_unknown_legacy_tool(tmp_path: Path) -> None:
+    workspace = _git_workspace(tmp_path)
     with pytest.raises(RuntimeError, match="invalid Qwen action kind"):
         await run_agent(
             "Run an unsafe command",
-            str(tmp_path),
-            settings=Settings(max_rounds=1),
+            str(workspace),
+            settings=_settings(workspace, 1),
             client=InvalidLegacyToolClient(),
         )
 
@@ -138,10 +151,11 @@ async def test_agent_rejects_malformed_final_answer(
     tmp_path: Path,
     payload: dict[str, Any],
 ) -> None:
+    workspace = _git_workspace(tmp_path)
     with pytest.raises(RuntimeError, match="invalid final answer"):
         await run_agent(
             "Return a final answer",
-            str(tmp_path),
-            settings=Settings(max_rounds=1),
+            str(workspace),
+            settings=_settings(workspace, 1),
             client=StaticClient(payload),
         )

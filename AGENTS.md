@@ -21,6 +21,7 @@
 
 - Qwenは読み取り専用workerとする。対象リポジトリへのファイル書込み、任意shell、git commit/push、外部ネットワークアクセスを与えない。
 - Qwenが利用できるリポジトリ操作は、MCP実装が公開する限定ツール（一覧、検索、読取、`git status`、`git diff`）だけとする。
+- `QWEN_ALLOWED_WORKSPACE_ROOTS` に明示されたGit worktree最上位だけをworkspaceとして許可し、未設定・home・兄弟repo・非Gitディレクトリはdefault denyとする。
 - パスは指定workspace配下に正規化し、シンボリックリンクを含むworkspace外参照を拒否する。秘密情報・VCS内部・runtime生成物など、workerに不要な領域はbridge側で遮断する。
 - Qwenの出力は提案・調査結果として扱い、変更適用、検証、最終判断は親Codexが行う。
 - モデルや推論バックエンドを追加する場合は `docs/specs/qwen-subagent.md` を先に更新する。
