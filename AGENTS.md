@@ -1,49 +1,29 @@
 # Codex Software Development Harness
 
-このファイルは全作業に必要な不変条件と、このリポジトリ固有のQwenサブエージェント境界を定義します。システム・開発者指示とユーザーの明示依頼を優先し、リポジトリ内では現在地に近い `AGENTS.override.md` / `AGENTS.md` を優先します。
+Shared rules are managed from `palladiumailab-collabmAILab/codex-dev-harness`; the pinned revision is recorded in `docs/harness-upstream.md`. Keep project-specific rules in `AGENTS.project.md` or explicitly project-specific skills/docs, and read `AGENTS.project.md` when present.
 
-## 不変条件
+## Common invariants
 
-- 依頼の目的、変更範囲、受け入れ条件を先に確認する。実装方針または完了判定を左右する曖昧さが残る場合は勝手に補完しない。
-- 長期に有効な製品・システム仕様は `docs/specs/` を正本として扱う。
-- テスト、lint、build、調査結果は受け入れ条件を裏づける証拠として扱い、それ自体をタスク完了とみなさない。
-- 依頼されていない機能・依存関係・外部連携・大規模リファクタリングを追加しない。
-- 既存の未コミット変更を保持する。`git reset --hard`、`git clean`、`git checkout --` 等で他者の変更を捨てない。
-- 変更は小さく目的単位に保ち、既存の構成・命名・依存関係・フォーマッタを尊重する。
-- 実行可能なソフトウェアは Docker で再現可能な開発・検証経路を持たせる。
-- Python では Ruff を lint / format の標準品質ゲートとする。
-- GitHub Actions を遠隔品質ゲートとし、PRで lint / format、テスト、build、プロジェクト固有検証を実行する。
-- 変更後は差分を再確認し、変更に比例したテスト・lint・buildを行う。実行できない検証は理由を明記する。
-- 秘密情報、秘密鍵、トークン、不要な個人情報を出力・コミット・外部送信しない。
-- 依頼のないデプロイ、課金、データ削除、権限変更、force push を行わない。
+- Preserve the requested outcome, explicit constraints, and acceptance criteria.
+- Before changing durable product/system behavior, read the relevant `docs/specs/` or existing canonical requirement source; surface conflicts instead of silently choosing one side.
+- Treat tests, lint, builds, CI, evaluations, and inspections as evidence, not as substitutes for the requested outcome. Do not weaken checks merely to obtain a pass.
+- Keep changes minimal and preserve unrelated work. Do not default to destructive reset/clean/checkout or force push.
+- Never expose or commit secrets, private keys, tokens, or unnecessary personal data. Do not deploy, incur charges, delete data, change permissions, or write to external services unless explicitly authorized.
+- Read only the nearest instructions and the specifications, code, tests, and configuration needed for the task. Avoid purposeless repository-wide scans and large log dumps.
 
-## Qwenサブエージェント境界
+## Read only when relevant
 
-- Qwenは読み取り専用workerとする。対象リポジトリへのファイル書込み、任意shell、git commit/push、外部ネットワークアクセスを与えない。
-- Qwenが利用できるリポジトリ操作は、MCP実装が公開する限定ツール（一覧、検索、読取、`git status`、`git diff`）だけとする。
-- パスは指定workspace配下に正規化し、シンボリックリンクを含むworkspace外参照を拒否する。秘密情報・VCS内部・runtime生成物など、workerに不要な領域はbridge側で遮断する。
-- Qwenの出力は提案・調査結果として扱い、変更適用、検証、最終判断は親Codexが行う。
-- モデルや推論バックエンドを追加する場合は `docs/specs/qwen-subagent.md` を先に更新する。
+- Docker / GitHub Actions / Python-Ruff / shared specification layout: `docs/project-baseline.md`
+- task contracts / evaluation / optimization semantics: `docs/harness-architecture.md`
+- explicit GitHub remote operations: `skills/github-operations/SKILL.md`
+- unfamiliar cross-module repository investigation: `skills/repo-research/SKILL.md`
+- evaluated iterative agent/workflow optimization: `skills/self-improvement/SKILL.md`
+- substantial multi-stage or multi-session handoff: `skills/long-running-work/SKILL.md`
 
-## 標準ワークフロー
+## Model use
 
-1. 目的・制約・受け入れ条件・変更対象を短く整理する。
-2. 関連する `docs/specs/`、コード、テストを調査する。
-3. 最小の変更を実装する。
-4. ローカルまたはDockerで検証する。
-5. GitHubへ反映する場合はPRとGitHub Actions結果を確認する。
-6. 変更内容、検証結果、残るリスクだけを簡潔に報告する。
+- Default to `gpt-5.6-sol / medium` for implementation, architecture, debugging, review, and integration.
+- Use `gpt-5.6-luna / max` only for bounded extraction, mechanical transformation, limited exploration, or independent read-only checks.
+- Escalate to Sol when the work requires cross-cutting judgment or a bounded Luna attempt fails; do not repeat the same failed cheap path.
 
-## モデルルーティング
-
-- 親: `gpt-5.6-sol / medium` — 実装、設計、デバッグ、レビュー、最終統合。
-- OpenAI worker: `gpt-5.6-luna / max` — 候補抽出、機械的変換、限定探索。
-- ローカルworker: `Qwen3-Coder-30B-A3B-Instruct Q4_K_M` — リポジトリ読み取り中心の調査、コードレビュー、候補抽出。
-- ローカルworkerの結論だけで変更を確定しない。親が差分と検証結果を確認する。
-
-## Skill の入口
-
-- `.agents/skills/repo-research/SKILL.md`: 未知のリポジトリや複雑な依存関係を実装前に調査するとき。
-- `.agents/skills/github-operations/SKILL.md`: GitHubへの作成・同期・Issue・PR等を明示的に依頼されたとき。
-
-GitHub操作の明示依頼がない通常のローカル開発では、GitHubへ自動的に書き込みません。
+Shared files listed in `docs/harness-upstream.md` remain upstream-managed; change common rules in the canonical harness first.
