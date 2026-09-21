@@ -8,6 +8,8 @@ from typing import Any
 from uuid import uuid4
 
 MODEL_ID = "Qwen/Qwen-Image-2.1"
+QUANTIZATION_BACKEND = "bitsandbytes_4bit"
+QUANTIZED_COMPONENTS = ("transformer", "text_encoder")
 ASPECT_RATIOS: dict[str, tuple[int, int]] = {
     "1:1": (2048, 2048),
     "4:3": (2400, 1792),
@@ -29,6 +31,8 @@ class QwenImageEngine:
         model_id: str = MODEL_ID,
         device: str = "cuda",
         dtype: str = "bfloat16",
+        quant_type: str = "nf4",
+        double_quant: bool = False,
         output_dir: str | Path = "outputs/qwen-image-2.1",
         pipeline: Any | None = None,
         generator_factory: GeneratorFactory | None = None,
@@ -37,6 +41,8 @@ class QwenImageEngine:
         self.model_id = model_id
         self.device = device
         self.dtype = dtype
+        self.quant_type = quant_type
+        self.double_quant = double_quant
         self.output_dir = Path(output_dir).expanduser()
         self._pipeline = pipeline
         self._generator_factory = generator_factory
@@ -48,6 +54,8 @@ class QwenImageEngine:
             model_id=os.getenv("QWEN_IMAGE_MODEL_ID", MODEL_ID),
             device=os.getenv("QWEN_IMAGE_DEVICE", "cuda"),
             dtype=os.getenv("QWEN_IMAGE_DTYPE", "bfloat16"),
+            quant_type=os.getenv("QWEN_IMAGE_QUANT_TYPE", "nf4"),
+            double_quant=_env_bool("QWEN_IMAGE_DOUBLE_QUANT", default=False),
             output_dir=os.getenv("QWEN_IMAGE_OUTPUT_DIR", "outputs/qwen-image-2.1"),
         )
 
@@ -56,10 +64,15 @@ class QwenImageEngine:
             "model_id": self.model_id,
             "device": self.device,
             "dtype": self.dtype,
+            "quantization_backend": QUANTIZATION_BACKEND,
+            "quantization_type": self.quant_type,
+            "double_quant": self.double_quant,
+            "quantized_components": list(QUANTIZED_COMPONENTS),
             "output_dir": str(self.output_dir.expanduser().resolve()),
             "model_loaded": self._pipeline is not None,
             "torch_installed": importlib.util.find_spec("torch") is not None,
             "diffusers_installed": importlib.util.find_spec("diffusers") is not None,
+            "bitsandbytes_installed": importlib.util.find_spec("bitsandbytes") is not None,
             "pillow_installed": importlib.util.find_spec("PIL") is not None,
         }
 
@@ -91,6 +104,7 @@ class QwenImageEngine:
         return {
             "path": str(output_path),
             "model_id": self.model_id,
+            "quantization": self.quantization_summary(),
             "prompt": prompt,
             "effective_prompt": effective_prompt,
             "width": width,
@@ -136,6 +150,7 @@ class QwenImageEngine:
         return {
             "path": str(output_path),
             "model_id": self.model_id,
+            "quantization": self.quantization_summary(),
             "prompt": prompt,
             "reference_image_count": len(images),
             "width": size_kwargs.get("width"),
@@ -145,6 +160,26 @@ class QwenImageEngine:
             "seed": seed,
         }
 
+    def quantization_summary(self) -> dict[str, Any]:
+        return {
+            "backend": QUANTIZATION_BACKEND,
+            "type": self.quant_type,
+            "double_quant": self.double_quant,
+            "components": list(QUANTIZED_COMPONENTS),
+        }
+
+    def _build_quantization_config(self, config_type: type[Any], compute_dtype: Any) -> Any:
+        return config_type(
+            quant_backend=QUANTIZATION_BACKEND,
+            quant_kwargs={
+                "load_in_4bit": True,
+                "bnb_4bit_quant_type": self.quant_type,
+                "bnb_4bit_compute_dtype": compute_dtype,
+                "bnb_4bit_use_double_quant": self.double_quant,
+            },
+            components_to_quantize=list(QUANTIZED_COMPONENTS),
+        )
+
     def _get_pipeline(self) -> Any:
         if self._pipeline is not None:
             return self._pipeline
@@ -152,9 +187,10 @@ class QwenImageEngine:
         try:
             import torch
             from diffusers import QwenImage21Pipeline
+            from diffusers.quantizers import PipelineQuantizationConfig
         except ImportError as exc:
             raise RuntimeError(
-                "Qwen-Image runtime dependencies are missing; "
+                "Qwen-Image quantized runtime dependencies are missing; "
                 'install with python -m pip install -e ".[model]"'
             ) from exc
 
@@ -164,11 +200,16 @@ class QwenImageEngine:
         if self.device.startswith("cuda") and not torch.cuda.is_available():
             raise RuntimeError("QWEN_IMAGE_DEVICE requests CUDA, but CUDA is not available")
 
-        pipeline = QwenImage21Pipeline.from_pretrained(
+        quantization_config = self._build_quantization_config(
+            PipelineQuantizationConfig,
+            torch_dtype,
+        )
+        self._pipeline = QwenImage21Pipeline.from_pretrained(
             self.model_id,
             dtype=torch_dtype,
+            quantization_config=quantization_config,
+            device_map=self.device,
         )
-        self._pipeline = pipeline.to(self.device)
         return self._pipeline
 
     def _make_generator(self, seed: int) -> Any:
@@ -246,3 +287,15 @@ class QwenImageEngine:
             f"{prompt}. "
             "The image has alpha channel and the background is transparent."
         )
+
+
+def _env_bool(name: str, *, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean value")
