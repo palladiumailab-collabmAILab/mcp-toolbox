@@ -23,8 +23,9 @@ mcp-toolbox/
 │   ├── jev-cloudflare/
 │   └── gemma-jev/
 ├── .github/workflows/
-│   ├── ci.yml       # 4サービスの検証
-│   └── deploy.yml   # Gemini/Jevの手動デプロイ
+│   ├── ci.yml              # 4サービスの検証
+│   ├── deploy-gemini.yml   # Gemini Workerの手動デプロイ
+│   └── deploy-jev.yml      # Jev Workerの手動デプロイ
 └── README.md
 ```
 
@@ -58,10 +59,17 @@ python scripts/validate.py
 
 ## デプロイ
 
-Cloudflare Workerのデプロイは、GitHub Actionsの `Deploy MCP service` を手動実行し、`gemini` または `jev` を選択します。Cloudflare認証情報と各WorkerのランタイムシークレットはGitHub/CloudflareのSecretsで管理します。
+Cloudflare Workerはサービスごとに独立してデプロイします。GitHub Actionsから対象サービス専用のワークフローを手動実行してください。
+
+- Gemini: `Deploy Gemini MCP`
+- Jev: `Deploy Jev MCP`
+
+両ワークフローは別々のWorkerへデプロイされ、一方の実行や失敗が他方のデプロイを開始・停止させることはありません。Cloudflare認証情報と各WorkerのランタイムシークレットはGitHub/CloudflareのSecretsで管理します。
 
 - Gemini: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`、Worker側の `GEMINI_API_KEY`, `MCP_BEARER_TOKEN`
 - Jev: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`、Worker側の `MCP_BEARER_TOKEN`
+
+初回のActionsデプロイ前に、各WorkerのランタイムシークレットをWranglerまたはCloudflare Dashboardで個別に登録してください。Geminiは必須シークレットが未登録の場合、デプロイ前検査で停止します。Jevはシークレットが未登録でもWorker自体は配置できますが、`/mcp` は設定完了まで `503` を返します。
 
 QwenとGemma-Jevはローカルstdio MCPであり、GPU・モデル・ローカル環境を必要とするため、ルートのCIではライブモデル起動やモデルダウンロードを行いません。
 
