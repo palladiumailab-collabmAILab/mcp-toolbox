@@ -25,6 +25,13 @@ For development:
 python -m pip install -e ".[dev]"
 ~~~
 
+The core package intentionally does not install the GPU serving stack. For a fresh vLLM environment, install the pinned serving and model extras together:
+
+~~~bash
+python -m pip install -e ".[serve,model]"
+gemma-jev-vllm --check-runtime
+~~~
+
 ## Model weights
 
 The model binary is intentionally **not committed to Git**. The upstream checkpoint is roughly 51.7 GB and split into 11 safetensors shards.
@@ -55,10 +62,18 @@ Weight binaries remain ignored by Git and Docker.
 
 ## Start DiffusionGemma with vLLM
 
+The serving contract is source-controlled in [`src/gemma_jev/vllm_compatibility.json`](src/gemma_jev/vllm_compatibility.json) and explained in [`docs/vllm-runtime.md`](docs/vllm-runtime.md): vLLM `0.29.0`, Python `3.11 <= version < 3.14`, Linux x86_64, NVIDIA CUDA 13.0 prebuilt wheel, and compute capability 7.5 or newer. The checkpoint is approximately 51.7 GB, so a suitable GPU-memory or tensor-parallel deployment is required. The launcher preflight rejects a missing or incompatible `vllm` executable before starting the server.
+
 Print the revision-pinned command:
 
 ~~~bash
 gemma-jev-vllm --print-only
+~~~
+
+Check the actual installed runtime without starting the server:
+
+~~~bash
+gemma-jev-vllm --check-runtime
 ~~~
 
 Start it directly:

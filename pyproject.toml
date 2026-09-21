@@ -21,6 +21,9 @@ dev = [
 model = [
     "huggingface_hub>=0.34,<2",
 ]
+serve = [
+    "vllm==0.29.0",
+]
 
 [project.scripts]
 gemma-jev = "gemma_jev.cli:main"
@@ -31,7 +34,7 @@ gemma-jev-vllm = "gemma_jev.serve:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-gemma_jev = ["model_manifest.json"]
+gemma_jev = ["model_manifest.json", "vllm_compatibility.json"]
 
 [tool.pytest.ini_options]
 pythonpath = [".", "src"]

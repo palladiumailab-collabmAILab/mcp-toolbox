@@ -81,6 +81,10 @@ Model weight binaries must not be committed to this repository. They are materia
 
 The `gemma-jev-vllm` launcher must use the pinned revision for remote loading. When serving a local checkpoint it must use a stable `--served-model-name` matching the client model id.
 
+## vLLM runtime
+
+The serving extra must install the exact vLLM version declared in `src/gemma_jev/vllm_compatibility.json`. The launcher must preflight the Python range and the installed `vllm --version` before starting a server, and must provide an actionable error when the executable is missing or incompatible. CPU-only validation must cover this contract without downloading vLLM or model weights.
+
 ## Benchmark evidence
 
 A live benchmark report must preserve enough provenance to be reviewable.

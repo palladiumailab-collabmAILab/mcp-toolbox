@@ -3,7 +3,10 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
-REQUIRED_MEMBER_SUFFIX = "gemma_jev/model_manifest.json"
+REQUIRED_MEMBER_SUFFIXES = (
+    "gemma_jev/model_manifest.json",
+    "gemma_jev/vllm_compatibility.json",
+)
 
 
 def wheel_contains_manifest(dist_dir: Path = Path("dist")) -> bool:
@@ -13,12 +16,16 @@ def wheel_contains_manifest(dist_dir: Path = Path("dist")) -> bool:
 
     wheel = wheels[-1]
     with zipfile.ZipFile(wheel) as archive:
-        return any(name.endswith(REQUIRED_MEMBER_SUFFIX) for name in archive.namelist())
+        members = archive.namelist()
+        return all(
+            any(name.endswith(suffix) for name in members) for suffix in REQUIRED_MEMBER_SUFFIXES
+        )
 
 
 def main() -> None:
     if not wheel_contains_manifest():
-        raise SystemExit(f"built wheel is missing {REQUIRED_MEMBER_SUFFIX}")
+        missing = ", ".join(REQUIRED_MEMBER_SUFFIXES)
+        raise SystemExit(f"built wheel is missing one of: {missing}")
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -7,7 +8,18 @@ from gemma_jev.serve import (
     DENY_REMOTE_MEDIA_DOMAIN,
     build_vllm_command,
     build_vllm_environment,
+    check_vllm_runtime,
+    load_vllm_compatibility,
 )
+
+
+def test_vllm_compatibility_manifest_is_pinned() -> None:
+    compatibility = load_vllm_compatibility()
+
+    assert compatibility.version == "0.29.0"
+    assert compatibility.python_min == (3, 11)
+    assert compatibility.python_max_exclusive == (3, 14)
+    assert compatibility.cuda == "13.0"
 
 
 def test_remote_command_pins_revision_and_served_name() -> None:
@@ -83,3 +95,40 @@ def test_local_command_requires_downloaded_directory(tmp_path: Path) -> None:
 
     with pytest.raises(FileNotFoundError):
         build_vllm_command(spec, local=True, local_dir=tmp_path / "missing")
+
+
+def test_runtime_preflight_accepts_pinned_vllm_version() -> None:
+    calls: list[list[str]] = []
+
+    def fake_runner(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="vllm 0.29.0\n", stderr="")
+
+    compatibility = check_vllm_runtime(runner=fake_runner, python_version=(3, 13))
+
+    assert compatibility.version == "0.29.0"
+    assert calls == [["vllm", "--version"]]
+
+
+def test_runtime_preflight_reports_missing_vllm() -> None:
+    def missing_runner(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        raise FileNotFoundError(command[0])
+
+    with pytest.raises(RuntimeError, match=r"\.\[serve\]"):
+        check_vllm_runtime(runner=missing_runner, python_version=(3, 13))
+
+
+def test_runtime_preflight_rejects_incompatible_vllm() -> None:
+    def fake_runner(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(command, 0, stdout="vllm 0.28.0\n", stderr="")
+
+    with pytest.raises(RuntimeError, match=r"requires vLLM 0\.29\.0"):
+        check_vllm_runtime(runner=fake_runner, python_version=(3, 13))
+
+
+def test_runtime_preflight_rejects_unsupported_python() -> None:
+    def unexpected_runner(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        raise AssertionError(f"runner should not be called: {command}")
+
+    with pytest.raises(RuntimeError, match=r"unsupported Python 3\.10"):
+        check_vllm_runtime(runner=unexpected_runner, python_version=(3, 10))
