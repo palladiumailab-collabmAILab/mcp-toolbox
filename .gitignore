@@ -13,6 +13,7 @@ models/cache/
 **/node_modules/
 **/dist/
 **/coverage/
+**/outputs/
 **/.wrangler/
 
 # Generated reports and build artifacts

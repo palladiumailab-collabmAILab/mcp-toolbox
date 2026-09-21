@@ -50,6 +50,30 @@ jobs:
       - name: Build Docker image
         run: docker build -t qwen-coder-subagent-mcp:test .
 
+  qwen-image:
+    name: Qwen-Image-2.1 MCP
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: servers/qwen-image-mcp
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: servers/qwen-image-mcp/pyproject.toml
+      - name: Install deterministic dependencies
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - name: Ruff
+        run: |
+          python -m ruff check .
+          python -m ruff format --check .
+      - name: Test and compile
+        run: |
+          python -m pytest -q
+          python -m compileall -q src
+
   gemini:
     name: Gemini remote MCP
     runs-on: ubuntu-latest
