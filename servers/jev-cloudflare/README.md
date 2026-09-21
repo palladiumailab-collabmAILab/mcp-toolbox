@@ -70,7 +70,7 @@ npx wrangler secret put MCP_BEARER_TOKEN
 npm run deploy
 ```
 
-The repository also contains a manual GitHub Actions deployment workflow. Configure repository Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` before using it. The runtime `MCP_BEARER_TOKEN` remains a Cloudflare Worker secret and must already be configured.
+The repository also contains a dedicated manual `Deploy Jev MCP` GitHub Actions workflow. Configure repository Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` before using it. The runtime `MCP_BEARER_TOKEN` remains a Cloudflare Worker secret and must already be configured for `/mcp` to accept requests.
 
 ## MCP client configuration
 

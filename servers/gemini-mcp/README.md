@@ -50,7 +50,7 @@ npm run deploy
 
 `npm run deploy` first verifies that both Worker secrets exist and refuses to deploy if either is missing. The GitHub Actions deployment workflow performs the same preflight with the configured Cloudflare credentials.
 
-Or add repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, then run the `Deploy Worker` GitHub Actions workflow. `GEMINI_API_KEY` and `MCP_BEARER_TOKEN` remain Worker secrets and must be provisioned separately.
+Or add repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, then run the dedicated `Deploy Gemini MCP` GitHub Actions workflow. `GEMINI_API_KEY` and `MCP_BEARER_TOKEN` remain Worker secrets and must be provisioned separately.
 
 After deployment:
 
