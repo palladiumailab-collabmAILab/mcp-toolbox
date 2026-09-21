@@ -336,6 +336,10 @@ class RepoContext:
             "--glob",
             "!.pypirc",
         ]
+        for name in sorted(_SENSITIVE_FILENAMES):
+            args.extend(["--glob", f"!{name}", "--glob", f"!**/{name}"])
+        for suffix in _SENSITIVE_SUFFIXES:
+            args.extend(["--glob", f"!*{suffix}", "--glob", f"!**/*{suffix}"])
         for directory in sorted(_EXCLUDED_DIRS):
             args.extend(["--glob", f"!{directory}/**", "--glob", f"!**/{directory}/**"])
         args.extend(["--", query, relative_start])

@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -87,6 +88,31 @@ def test_sensitive_and_runtime_paths_are_not_visible(git_workspace: Path) -> Non
     assert ".env.example" not in repo.list_files()
     assert ".aws/credentials" not in repo.list_files()
     assert "private.pem" not in repo.list_files()
+
+
+def test_rg_search_hides_sensitive_files(git_workspace: Path) -> None:
+    rg = shutil.which("rg")
+    if rg is None:
+        pytest.skip("ripgrep is not installed")
+
+    sensitive_files = {
+        "credentials": "needle\n",
+        "credentials.json": "needle\n",
+        "token.json": "needle\n",
+        "id_rsa": "needle\n",
+        "private.key": "needle\n",
+        "private.pem": "needle\n",
+    }
+    for name, contents in sensitive_files.items():
+        (git_workspace / name).write_text(contents, encoding="utf-8")
+    (git_workspace / "visible.txt").write_text("needle\n", encoding="utf-8")
+
+    repo = RepoContext.create(str(git_workspace), allowed_workspace_roots=[git_workspace])
+    matches = repo.search_text("needle")
+
+    assert "visible.txt:1: needle" in matches
+    for name in sensitive_files:
+        assert name not in matches
 
 
 def test_model_controlled_limits_have_hard_caps(git_workspace: Path) -> None:
