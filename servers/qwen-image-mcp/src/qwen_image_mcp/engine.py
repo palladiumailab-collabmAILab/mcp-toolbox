@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import importlib.util
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from uuid import uuid4
 
 MODEL_ID = "Qwen/Qwen-Image-2.1"
@@ -42,7 +43,7 @@ class QwenImageEngine:
         self._image_loader = image_loader
 
     @classmethod
-    def from_env(cls) -> "QwenImageEngine":
+    def from_env(cls) -> QwenImageEngine:
         return cls(
             model_id=os.getenv("QWEN_IMAGE_MODEL_ID", MODEL_ID),
             device=os.getenv("QWEN_IMAGE_DEVICE", "cuda"),
@@ -153,7 +154,8 @@ class QwenImageEngine:
             from diffusers import QwenImage21Pipeline
         except ImportError as exc:
             raise RuntimeError(
-                'Qwen-Image runtime dependencies are missing; install with python -m pip install -e ".[model]"'
+                "Qwen-Image runtime dependencies are missing; "
+                'install with python -m pip install -e ".[model]"'
             ) from exc
 
         torch_dtype = getattr(torch, self.dtype, None)
