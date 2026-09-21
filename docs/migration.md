@@ -13,11 +13,13 @@
 
 これらはソース統合や決定的なCIでは代替できないため、必要な環境が整った時点で `mcp-toolbox` 側から実施します。
 
-- Qwen: RTX 4060 8GB上で代表的な `qwen_delegate` 実機E2Eと、`n_cpu_moe` の候補別3回以上の性能比較。旧Issue [#4](https://github.com/palladiumailab-collabmAILab/qwen-coder-subagent-mcp/issues/4) の残件。
-- Gemini: 実Cloudflare Workerで、`MCP_BEARER_TOKEN` 未設定・不正・正しいトークンのfail-closed動作とMCP呼び出しを確認。旧Issue [#4](https://github.com/palladiumailab-collabmAILab/Gemini_MCP/issues/4) の残件。
-- Jev: 実Cloudflare Workerで `/health`、認証拒否、`jev_evaluate` の実推論、機密情報非出力を確認。旧Issue [#2](https://github.com/palladiumailab-collabmAILab/Jev-cloudflare/issues/2) の残件。
-- Gemma-Jev: 対応GPU・CUDA・vLLM環境で約51.7GBのDiffusionGemmaを読み込み、`/v1/models` と最小決定要求を確認。旧Issue [#18](https://github.com/palladiumailab-collabmAILab/Gemma-Jev/issues/18) の残件。
+- Qwen: RTX 4060 8GB上で代表的な `qwen_delegate` 実機E2Eと、`n_cpu_moe` の候補別3回以上の性能比較。[toolbox #1](https://github.com/palladiumailab-collabmAILab/mcp-toolbox/issues/1) で追跡。
+- Gemini: 実Cloudflare Workerで、`MCP_BEARER_TOKEN` 未設定・不正・正しいトークンのfail-closed動作とMCP呼び出しを確認。[toolbox #2](https://github.com/palladiumailab-collabmAILab/mcp-toolbox/issues/2) で追跡。
+- Jev: 実Cloudflare Workerで `/health`、認証拒否、`jev_evaluate` の実推論、機密情報非出力を確認。[toolbox #3](https://github.com/palladiumailab-collabmAILab/mcp-toolbox/issues/3) で追跡。
+- Gemma-Jev: 対応GPU・CUDA・vLLM環境で約51.7GBのDiffusionGemmaを読み込み、`/v1/models` と最小決定要求を確認。[toolbox #4](https://github.com/palladiumailab-collabmAILab/mcp-toolbox/issues/4) で追跡。
+
+旧リポジトリ側の対応Issueは移行先をコメントして閉じ、未解決の実環境検証は上記4件へ一本化しています。
 
 ## 旧PRの扱い
 
-旧リポジトリに残るCodexハーネス同期PRは、モノレポのルート `AGENTS.md` とルートCIへ整理したため、個別リポジトリの変更としては引き継ぎません。必要なプロジェクト固有ルールは各サービス配下に残しています。
+旧リポジトリに残っていたCodexハーネス同期PRは、モノレポのルート `AGENTS.md` とルートCIへ整理したため、移行先をコメントして閉じました。必要なプロジェクト固有ルールは各サービス配下に残しています。
