@@ -40,12 +40,12 @@ def create_server(engine: QwenImageEngine | None = None) -> MCPServer:
     def qwen_image_edit(
         prompt: str,
         image_paths: list[str],
-        aspect_ratio: str = "1:1",
+        aspect_ratio: str = "source",
         num_inference_steps: int = 40,
         seed: int = 42,
         output_name: str | None = None,
     ) -> dict[str, Any]:
-        """Edit or compose from 1-10 local reference images with Qwen-Image-2.1."""
+        """Edit 1-10 local images; source aspect ratio is preserved by default."""
         return image_engine.edit(
             prompt,
             image_paths,
