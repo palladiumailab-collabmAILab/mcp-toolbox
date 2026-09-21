@@ -88,7 +88,11 @@ async def run_agent(
     max_rounds: int | None = None,
 ) -> dict[str, Any]:
     effective_settings = settings or Settings.from_env()
-    repo = RepoContext.create(workspace, effective_settings.max_tool_output_chars)
+    repo = RepoContext.create(
+        workspace,
+        effective_settings.max_tool_output_chars,
+        effective_settings.allowed_workspace_roots,
+    )
     rounds = max_rounds if max_rounds is not None else effective_settings.max_rounds
     if rounds < 1 or rounds > 32:
         raise ValueError("max_rounds must be between 1 and 32")

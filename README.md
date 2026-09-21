@@ -29,6 +29,14 @@ powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 
 ## Start Qwen
 
+`qwen_delegate` は明示的にallowlistされたGit worktreeの最上位だけを調査対象にします。既定値はdenyです。起動前に対象リポジトリを登録してください。
+
+```powershell
+$env:QWEN_ALLOWED_WORKSPACE_ROOTS = (Resolve-Path .).Path
+```
+
+複数リポジトリを許可する場合は、Windowsでは`;`、Unix系では`:`で絶対パスを区切ります。allowlistにないhome、兄弟リポジトリ、非Gitディレクトリは拒否されます。
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\start-model.ps1
 ```
@@ -93,6 +101,7 @@ prompt処理または生成速度が基準から既定15%以上低下すると�
 | `QWEN_MAX_ROUNDS` | `8` | local agent tool-loop limit |
 | `QWEN_MAX_OUTPUT_TOKENS` | `2048` | one model response limit |
 | `QWEN_MAX_TOOL_OUTPUT_CHARS` | `24000` | tool result cap |
+| `QWEN_ALLOWED_WORKSPACE_ROOTS` | *(required)* | exact absolute paths of allowed top-level Git worktrees |
 
 ## Validation
 

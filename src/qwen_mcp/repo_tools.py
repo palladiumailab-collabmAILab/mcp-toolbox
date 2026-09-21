@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -15,13 +16,33 @@ _EXCLUDED_DIRS = {
     ".ruff_cache",
     ".venv",
     "__pycache__",
+    ".aws",
+    ".azure",
+    ".gnupg",
+    ".kube",
+    ".ssh",
+    ".terraform.d",
     "build",
     "dist",
     "models",
     "node_modules",
     "venv",
 }
-_SENSITIVE_FILENAMES = {".env", ".git-credentials", ".netrc", ".npmrc", ".pypirc"}
+_SENSITIVE_FILENAMES = {
+    ".env",
+    ".git-credentials",
+    ".netrc",
+    ".npmrc",
+    ".pypirc",
+    "credentials",
+    "credentials.json",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+    "id_rsa",
+    "token.json",
+}
+_SENSITIVE_SUFFIXES = (".key", ".pem", ".p12", ".pfx")
 _MAX_FILE_BYTES = 2_000_000
 _MAX_LIST_ENTRIES = 1_000
 _MAX_SEARCH_MATCHES = 500
@@ -38,11 +59,65 @@ class RepoContext:
     max_output_chars: int = 24_000
 
     @classmethod
-    def create(cls, workspace: str, max_output_chars: int = 24_000) -> RepoContext:
+    def create(
+        cls,
+        workspace: str,
+        max_output_chars: int = 24_000,
+        allowed_workspace_roots: Iterable[str | Path] = (),
+    ) -> RepoContext:
         root = Path(workspace).expanduser().resolve(strict=True)
         if not root.is_dir():
             raise RepoToolError(f"workspace is not a directory: {root}")
+        allowed_roots = cls._resolve_allowed_roots(allowed_workspace_roots)
+        if root not in allowed_roots:
+            raise RepoToolError(
+                "workspace is not allowlisted; configure QWEN_ALLOWED_WORKSPACE_ROOTS"
+            )
+        worktree_root = cls._git_worktree_root(root)
+        if worktree_root != root:
+            raise RepoToolError("workspace must be the top-level Git worktree root")
         return cls(root=root, max_output_chars=max_output_chars)
+
+    @staticmethod
+    def _resolve_allowed_roots(roots: Iterable[str | Path]) -> frozenset[Path]:
+        resolved: set[Path] = set()
+        for value in roots:
+            candidate = Path(value).expanduser()
+            try:
+                candidate = candidate.resolve(strict=True)
+            except OSError as exc:
+                raise RepoToolError(f"allowed workspace root is invalid: {value}") from exc
+            if not candidate.is_dir():
+                raise RepoToolError(f"allowed workspace root is not a directory: {candidate}")
+            resolved.add(candidate)
+        if not resolved:
+            raise RepoToolError(
+                "no allowed workspace roots configured; set QWEN_ALLOWED_WORKSPACE_ROOTS"
+            )
+        return frozenset(resolved)
+
+    @staticmethod
+    def _git_worktree_root(path: Path) -> Path:
+        env = os.environ.copy()
+        env["GIT_OPTIONAL_LOCKS"] = "0"
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        completed = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "--show-toplevel"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            env=env,
+        )
+        if completed.returncode != 0:
+            raise RepoToolError("workspace must be a Git worktree root")
+        output = completed.stdout.strip()
+        if not output:
+            raise RepoToolError("workspace must be a Git worktree root")
+        try:
+            return Path(output).resolve(strict=True)
+        except OSError as exc:
+            raise RepoToolError("workspace must be a Git worktree root") from exc
 
     def _resolve(self, relative_path: str) -> Path:
         candidate = (self.root / relative_path).resolve(strict=False)
@@ -62,7 +137,11 @@ class RepoContext:
     @staticmethod
     def _is_sensitive_filename(name: str) -> bool:
         lowered = name.lower()
-        return lowered in _SENSITIVE_FILENAMES or lowered.startswith(".env.")
+        return (
+            lowered in _SENSITIVE_FILENAMES
+            or lowered.startswith(".env.")
+            or lowered.endswith(_SENSITIVE_SUFFIXES)
+        )
 
     @staticmethod
     def _git_exclude_pathspecs() -> list[str]:
@@ -80,6 +159,13 @@ class RepoContext:
                 ":(exclude,glob)**/.env.*",
             ]
         )
+        for suffix in _SENSITIVE_SUFFIXES:
+            pathspecs.extend(
+                [
+                    f":(exclude,glob)*{suffix}",
+                    f":(exclude,glob)**/*{suffix}",
+                ]
+            )
         for directory in sorted(_EXCLUDED_DIRS):
             pathspecs.extend(
                 [
@@ -250,6 +336,10 @@ class RepoContext:
             "--glob",
             "!.pypirc",
         ]
+        for name in sorted(_SENSITIVE_FILENAMES):
+            args.extend(["--glob", f"!{name}", "--glob", f"!**/{name}"])
+        for suffix in _SENSITIVE_SUFFIXES:
+            args.extend(["--glob", f"!*{suffix}", "--glob", f"!**/*{suffix}"])
         for directory in sorted(_EXCLUDED_DIRS):
             args.extend(["--glob", f"!{directory}/**", "--glob", f"!**/{directory}/**"])
         args.extend(["--", query, relative_start])
