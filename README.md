@@ -10,7 +10,7 @@ MCPサーバー、ローカルMCPブリッジ、モデル連携ツールを一�
 | [`gemini-mcp`](servers/gemini-mcp/) | リモートMCP | `ask_gemini` | Cloudflare Workers / Gemini API |
 | [`jev-cloudflare`](servers/jev-cloudflare/) | リモートMCP | `jev_evaluate` | Cloudflare Workers AI / TypeSafe Jev |
 | [`gemma-jev`](servers/gemma-jev/) | ローカルstdioサーバー | `decide`, `status` | Python / vLLM / DiffusionGemma |
-| [`qwen-image-mcp`](servers/qwen-image-mcp/) | ローカルstdioサーバー | `qwen_image_generate`, `qwen_image_edit`, `qwen_image_status` | Python / Diffusers / Qwen-Image-2.1 |
+| [`qwen-image-mcp`](servers/qwen-image-mcp/) | ローカルstdioサーバー | `qwen_image_generate`, `qwen_image_edit`, `qwen_image_status` | Python / Diffusers / bitsandbytes NF4 / Qwen-Image-2.1 |
 
 各サービスは独立した依存関係・設定・検証手順を維持し、ルートのGitHub Actionsがまとめて品質ゲートを実行します。モデル重み、APIキー、Cloudflareシークレットはリポジトリに含めません。
 
@@ -58,7 +58,7 @@ npm run check
 Set-Location ../gemma-jev
 python scripts/validate.py
 
-# Qwen-Image-2.1（実モデルは任意依存、CIでは未ロード）
+# Qwen-Image-2.1（transformer + text_encoderを4-bit NF4量子化、CIでは実モデル未ロード）
 Set-Location ../qwen-image-mcp
 python -m ruff check .
 python -m ruff format --check .
