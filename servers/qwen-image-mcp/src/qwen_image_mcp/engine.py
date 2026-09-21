@@ -105,7 +105,7 @@ class QwenImageEngine:
         prompt: str,
         image_paths: list[str],
         *,
-        aspect_ratio: str = "1:1",
+        aspect_ratio: str = "source",
         num_inference_steps: int = 40,
         seed: int = 42,
         output_name: str | None = None,
@@ -114,7 +114,10 @@ class QwenImageEngine:
         if not 1 <= len(image_paths) <= 10:
             raise ValueError("image_paths must contain between 1 and 10 images")
 
-        width, height = self._size_for(aspect_ratio)
+        size_kwargs: dict[str, int] = {}
+        if aspect_ratio != "source":
+            width, height = self._size_for(aspect_ratio)
+            size_kwargs = {"width": width, "height": height}
         steps = self._validate_steps(num_inference_steps)
         seed = self._validate_seed(seed)
         images = [self._load_image(path) for path in image_paths]
@@ -123,10 +126,9 @@ class QwenImageEngine:
         result = self._get_pipeline()(
             prompt=prompt,
             image=image_arg,
-            width=width,
-            height=height,
             num_inference_steps=steps,
             generator=self._make_generator(seed),
+            **size_kwargs,
         )
         image = result.images[0]
         output_path = self._save_image(image, output_name)
@@ -135,8 +137,8 @@ class QwenImageEngine:
             "model_id": self.model_id,
             "prompt": prompt,
             "reference_image_count": len(images),
-            "width": width,
-            "height": height,
+            "width": size_kwargs.get("width"),
+            "height": size_kwargs.get("height"),
             "aspect_ratio": aspect_ratio,
             "num_inference_steps": steps,
             "seed": seed,
@@ -231,7 +233,9 @@ class QwenImageEngine:
             return ASPECT_RATIOS[aspect_ratio]
         except KeyError as exc:
             supported = ", ".join(ASPECT_RATIOS)
-            raise ValueError(f"unsupported aspect_ratio {aspect_ratio!r}; choose one of: {supported}") from exc
+            raise ValueError(
+                f"unsupported aspect_ratio {aspect_ratio!r}; choose one of: {supported}"
+            ) from exc
 
     @staticmethod
     def _transparent_prompt(prompt: str) -> str:
