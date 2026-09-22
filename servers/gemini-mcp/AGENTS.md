@@ -9,4 +9,4 @@ This repository follows the reusable baseline from `codex-dev-harness`.
 - GitHub Actions is the canonical remote quality gate for PRs and `main` pushes.
 - Before completion, run format, lint, type-check, tests, Worker dry-run build, and Docker build when available.
 - Do not weaken validation only to make CI pass.
-- Production deployment is an explicit action. Cloudflare and Gemini credentials must be provided through secrets, never source files.
+- Production deployment is disabled in this monorepo. Do not add a Cloudflare deployment workflow, deploy script, account credential, or Worker secret without an explicit repository scope decision.

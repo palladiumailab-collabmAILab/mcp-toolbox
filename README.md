@@ -7,7 +7,7 @@ MCPサーバー、ローカルMCPブリッジ、モデル連携ツールを一�
 | サービス | 種別 | MCPツール | 実行環境 |
 | --- | --- | --- | --- |
 | [`qwen-coder-subagent-mcp`](servers/qwen-coder-subagent-mcp/) | ローカルstdioブリッジ | `qwen_health`, `qwen_delegate` | Windows / llama.cpp / Qwen |
-| [`gemini-mcp`](servers/gemini-mcp/) | リモートMCP | `ask_gemini` | Cloudflare Workers / Gemini API |
+| [`gemini-mcp`](servers/gemini-mcp/) | ローカル検証のみ | `ask_gemini` | Wrangler local / Gemini API |
 | [`jev-cloudflare`](servers/jev-cloudflare/) | リモートMCP | `jev_evaluate` | Cloudflare Workers AI / TypeSafe Jev |
 | [`gemma-jev`](servers/gemma-jev/) | ローカルstdioサーバー | `decide`, `status` | Python / vLLM / DiffusionGemma |
 | [`qwen-image-mcp`](servers/qwen-image-mcp/) | ローカルstdioサーバー | `qwen_image_generate`, `qwen_image_edit`, `qwen_image_status` | Python / Diffusers / bitsandbytes NF4 / Qwen-Image-2.1 |
