@@ -21,9 +21,9 @@ Expose a small remote MCP server on Cloudflare Workers that delegates selected t
 - Target Cloudflare Workers and current stateless Streamable HTTP MCP handling.
 - Keep the server stateless; no Durable Object or database is required.
 - Do not log or return secret values.
-- Require a deployment preflight to confirm `GEMINI_API_KEY` and `MCP_BEARER_TOKEN` Worker secrets exist.
+- Preserve the fail-closed secret contract in local tests without provisioning Cloudflare Worker secrets.
 - Keep the implementation small enough for the Workers Free plan's lightweight request model; Gemini network wait time is external I/O.
-- Provide Docker, GitHub Actions validation, and a manual deployment workflow.
+- Provide Docker and GitHub Actions validation without a Cloudflare deployment workflow.
 
 ## Current product limitation
 
