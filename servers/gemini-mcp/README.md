@@ -38,26 +38,11 @@ npm run validate
 docker build -t gemini-mcp .
 ```
 
-## Cloudflare deployment
+## Deployment status
 
-Set Worker secrets locally:
-
-```bash
-npx wrangler secret put GEMINI_API_KEY
-npx wrangler secret put MCP_BEARER_TOKEN
-npm run deploy
-```
-
-`npm run deploy` first verifies that both Worker secrets exist and refuses to deploy if either is missing. The GitHub Actions deployment workflow performs the same preflight with the configured Cloudflare credentials.
-
-Or add repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, then run the dedicated `Deploy Gemini MCP` GitHub Actions workflow. `GEMINI_API_KEY` and `MCP_BEARER_TOKEN` remain Worker secrets and must be provisioned separately.
-
-After deployment:
-
-```text
-https://gemini-mcp.<your-subdomain>.workers.dev/mcp
-https://gemini-mcp.<your-subdomain>.workers.dev/health
-```
+このモノレポではGeminiのCloudflareデプロイを無効化しています。Gemini MCPは
+`wrangler dev` と `npm run validate` によるローカル検証だけを行います。
+Cloudflareの認証情報やWorkerシークレットをこのリポジトリへ追加しないでください。
 
 ## ChatGPT compatibility
 
