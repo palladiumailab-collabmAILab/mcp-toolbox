@@ -21,6 +21,8 @@ benchmark-report.json
 **/*.egg-info/
 **/build/
 **/wheelhouse/
+**/__pycache__/
+**/*.py[cod]
 
 # Local package-manager artifacts created during migration
 package-lock.json
